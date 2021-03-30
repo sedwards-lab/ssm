@@ -10,6 +10,7 @@ typedef struct { \
   type event_value; \
 } sv_##type##_t; \
 \
+extern void to_string_##type(sv_t *, char *, size_t); \
 extern void initialize_##type(sv_##type##_t *); \
 extern void assign_##type(sv_##type##_t *,  priority_t, type); \
 extern void later_##type(sv_##type##_t *, peng_time_t, type);

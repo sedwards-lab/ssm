@@ -7,7 +7,7 @@
 #include "peng.h"
 #include <assert.h>
 #include <stdint.h>
-// #include <stdio.h>
+#include <stdio.h>
 
 peng_time_t now;
 
@@ -139,10 +139,18 @@ void tick()
   // remove the event from the queue, update its variable, and schedule
   // everything sensitive to it
 
+#ifdef DEBUG
+  char buffer[24];
+#endif
+
   while ( event_queue_len > 0 && event_queue[1]->event_time == now ) {
     sv_t *var = event_queue[1];
     
     (*var->update)(var);     // Update the value
+#ifdef DEBUG
+    var->to_string(var, buffer, 24);
+    printf("event %lu value %s\n", now, buffer);
+#endif
     var->last_updated = now; // Remember that it was updated
     // Schedule all sensitive continuations
     for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next)

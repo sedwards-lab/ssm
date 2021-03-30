@@ -92,7 +92,8 @@ typedef struct sv sv_t;
   void (*update)(sv_t *);   /* Function to update this particular type       */\
   struct trigger *triggers; /* Doubly-linked list of sensitive continuations */\
   peng_time_t last_updated;  /* Time of last update, for detecting event     */\
-  peng_time_t event_time     /* Time at which the variable should be updated */
+  peng_time_t event_time;     /* Time at which the variable should be updated */\
+  void (*to_string)(sv_t *, char *, size_t)
 
 // "Base class" for scheduled variable
 struct sv {

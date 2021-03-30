@@ -1,6 +1,8 @@
 #ifndef _PENG_SCALAR_CODE_H
 #define _PENG_SCALAR_CODE_H
 
+#include <stdio.h>
+#include "formatters.h"
 #include "peng-scalar.h"
 
 #define PENG_SCALAR_CODE(type) \
@@ -12,13 +14,20 @@ void update_##type(sv_t *var) \
   iv->value = iv->event_value; \
 } \
 \
+void to_string_##type(sv_t *v, char *buffer, size_t size) { \
+    sv_##type##_t* iv = (sv_##type##_t *) v; \
+    char str[] = str_##type " " format_##type; \
+    snprintf(buffer, size, str, iv->value); \
+}\
+\
 void initialize_##type(sv_##type##_t *v) \
 { \
   assert(v); \
-  *v = (sv_##type##_t) { .update = update_##type, \
-    		         .triggers = NULL, \
-			 .last_updated = now, \
-			 .event_time = NO_EVENT_SCHEDULED }; \
+  *v = (sv_##type##_t) { .to_string = to_string_##type,\
+                         .update = update_##type, \
+                         .triggers = NULL, \
+			                   .last_updated = now, \
+			                   .event_time = NO_EVENT_SCHEDULED }; \
 } \
 \
 void assign_##type(sv_##type##_t *iv, priority_t priority, type value) \
