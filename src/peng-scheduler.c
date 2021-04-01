@@ -18,11 +18,11 @@ extern inline void call(act_t *);
 extern inline bool event_on(sv_t *);
 
 
-#define CONT_QUEUE_SIZE 1024
+#define CONT_QUEUE_SIZE 2048
 cont_queue_index_t cont_queue_len = 0;
 act_t *cont_queue[CONT_QUEUE_SIZE+1];
 
-#define EVENT_QUEUE_SIZE 1024
+#define EVENT_QUEUE_SIZE 2048
 event_queue_index_t event_queue_len = 0;
 sv_t *event_queue[EVENT_QUEUE_SIZE+1];
 
