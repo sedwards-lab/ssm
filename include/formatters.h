@@ -3,7 +3,7 @@
 #endif
 
 #define format_int "%d"
-#define format_int64 "%lu"
+#define format_int64 "%ld"
 #define format_bool "%d"
 
 #define str_int   "int"
