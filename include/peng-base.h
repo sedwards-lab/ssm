@@ -37,7 +37,7 @@ typedef void stepf_t(act_t *); // Type of a step function
   uint16_t pc;	            /* Stored "program counter" for the function */\
   uint16_t children;        /* Number of running child threads */\
   priority_t priority;	    /* Execution priority */\
-  depth_t depth;  /* Index of the LSB in our priority */\
+  depth_t depth;            /* Index of the LSB in our priority */\
   bool scheduled            /* True when in the schedule queue */
   
 struct act {  // Start of every function activation record
@@ -54,7 +54,7 @@ enter(size_t bytes, stepf_t *step, act_t *parent,
   assert(step);
   assert(parent);
   ++parent->children; // Add ourself as a child
-  act_t *act = malloc(bytes);
+  act_t *act = calloc(1,bytes);
   *act = (act_t) { .step = step,
 		   .caller = parent,
 		   .pc = 0,
@@ -83,6 +83,11 @@ inline void leave(act_t *act, size_t bytes)
     call(caller);                // If so, run our parent
 }
 
+// Deallocate an activation record, but don't return to caller
+inline void leave_no_sched(act_t *act, size_t bytes) {
+  assert(act);
+  free(act);
+}
 
 // Scheduled variables
 
