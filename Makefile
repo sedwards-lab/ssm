@@ -1,10 +1,11 @@
+CC = gcc
 CFLAGS = -g -Wall -pedantic -std=c99
 
 EXE = fib fib2 fib3 counter counter2 clock onetwo
 
 all : $(EXE)
 
-scheduler.o fib.o counter.o counter2.o clock.o : ssm.h
+types.o scheduler.o fib.o counter.o counter2.o clock.o : ssm.h
 
 fib : fib.o scheduler.o
 	$(CC) $(CFLAGS) -o $@ $^
@@ -26,6 +27,9 @@ clock : clock.o scheduler.o
 
 onetwo : onetwo.o scheduler.o
 	$(CC) $(CFLAGS) -o $@ $^
+
+compile_commands.json: Makefile
+	bear make all
 
 .PHONY : clean
 clean :
