@@ -90,6 +90,7 @@ inline void leave(rar_t *rar, size_t bytes)
 typedef unsigned long any_t;
 
 typedef struct cv cv_t;			/* Forward-declared type name for generic channel variable */
+// FIXME: this macro doesn't work like I think it should; just remove it
 #define CVT(type_name) type_name##_cvt	/* Channel variable name mangler */
 typedef size_t sel_t;			/* Member selector for aggregate data types */
 #define BAD_SELECTOR ULONG_MAX		/* Poison value for selector queue */
@@ -99,19 +100,33 @@ typedef struct trigger trigger_t;	/* Forward-declared type name for channel trig
  * Channel variable interface, pointers to which are placed in the event queue.
  */
 #define CHANNEL_VARIABLE_FIELDS \
-	void (*update)(cv_t *);		/* See below */\
-	void (*assign)(cv_t *, priority_t, const any_t, sel_t); /* See below */\
-	void (*later)(cv_t *, ssm_time_t, const any_t, sel_t); /* See below */\
+	void (*update)(cv_t *);					/* See below */\
+	void (*assign)(cv_t *, priority_t, const any_t, sel_t);	/* See below */\
+	void (*later)(cv_t *, ssm_time_t, const any_t, sel_t);	/* See below */\
 	struct trigger *triggers;	/* List of sensitive continuations */\
 	sel_t selector;			/* Which element is being updated */\
-	ssm_time_t event_time		/* Time at which the variable should be updated  */
+	ssm_time_t event_time 		/* Time at which the variable should be updated  */\
 
 /**
  * "Base class" for channel variable
  */
 struct cv {
     CHANNEL_VARIABLE_FIELDS;
+    void *select;
+    /**^
+     * The select field is used to obtain the address of each payload member.
+     * In concrete implementations of cv_t, select will actually be an array of
+     * pointers void *select[sel_range], and is to be used as a lookup table
+     * for dereferencing pointers + selectors to this cv_t.
+     *
+     * Note that this does not have to be a full pointer; it could (and really
+     * should) just be some integral type that is large enough to represent the
+     * largest possible byte offset in a user-defined aggregate data structure.
+     */
 };
+
+#define DEREF(type, e) (type *) (((void **) &(e).ptr->select)[(e).offset])
+
 
 // TODO: place these in protected header file
 extern void schedule_sensitive(trigger_t *, priority_t, sel_t);
@@ -201,9 +216,9 @@ extern void unsched_event(cv_t *var);
  *   (^identical code for all implementations)
  * - Initializing update, assign, and later to the appropriate callbacks
  *   (^generic across all implementations (i.e., probably can be templated))
- * - Initializing last_updated to now
- *   (^common across all implementations, but requires some knowledge about
- *   structure of payload_t)
+ * - Initializing last_updated to now, and select to the right pointers
+ *   (^common across all implementations, but requires knowledge about structure
+ *   of payload_t)
  * - Setting initial value of channel variable payload, if any
  *   (^specific to channel variables with valued payloads)
  * - Initializing inner_queue and inner_time to BAD_SELECTOR and NO_EVENT_SCHEDULED
@@ -233,6 +248,7 @@ extern void unsched_event(cv_t *var);
  */
 typedef struct {
 	CHANNEL_VARIABLE_FIELDS;
+	void *select;
 	ssm_time_t last_updated;
 } CVT(unit);
 static const sel_t unit_sel_range = 1;
@@ -265,6 +281,7 @@ extern void initialize_unit(CVT(unit) *v);
 #define DECLARE_CHANNEL_VARIABLE_TYPE(payload_t, payload_param, sel_range) \
 	typedef struct { \
 		CHANNEL_VARIABLE_FIELDS; \
+		void *select[sel_range]; \
 		ssm_time_t last_updated[sel_range];	/* When each internal component was last updated */\
 		payload_t value;			/* Current value */\
 		payload_t later_value;			/* Buffered value */\
@@ -283,6 +300,7 @@ extern void initialize_unit(CVT(unit) *v);
 #define DECLARE_CHANNEL_VARIABLE_TYPE_VAL(payload_t) \
 	typedef struct { \
 		CHANNEL_VARIABLE_FIELDS; \
+		void *select[1]; \
 		ssm_time_t last_updated;		/* When value was last updated */\
 		payload_t value;			/* Current value */\
 		payload_t later_value;			/* Buffered value */\
@@ -297,18 +315,20 @@ extern void initialize_unit(CVT(unit) *v);
  * ptr_int_cvt), we still maintain a sel_t, because it is entirely possible that
  * the pointee resides in an aggregate data structure (with non-zero offset).
  */
-#define PTR(pointee_cvt) ptr_##pointee_cvt
-#define DECLARE_CHANNEL_VARIABLE_TYPE_PTR(pointee_cvt) \
+#define DEFINE_CHANNEL_VARIABLE_TYPE_PTR(pointee) \
 	typedef struct { \
 		cv_t *ptr;		/* Pointer to channel variable */\
 		sel_t offset;		/* Offset within ptr */\
-	} PTR(pointee_cvt)
+	} ptr_##pointee##_cvt; \
+	static inline ptr_##pointee##_cvt ptr_of_##pointee(CVT(pointee) *cvt) { \
+		return (ptr_##pointee##_cvt) { (cv_t *) cvt, 0 }; \
+	}
 
 /** Declare some basic data types */
 DECLARE_CHANNEL_VARIABLE_TYPE_VAL(int);
-DECLARE_CHANNEL_VARIABLE_TYPE_PTR(int_cvt);
+DEFINE_CHANNEL_VARIABLE_TYPE_PTR(int)
 DECLARE_CHANNEL_VARIABLE_TYPE_VAL(bool);
-DECLARE_CHANNEL_VARIABLE_TYPE_PTR(bool_cvt);
+DEFINE_CHANNEL_VARIABLE_TYPE_PTR(bool)
 
 /**
  * [3]Int data type
@@ -321,7 +341,7 @@ DECLARE_CHANNEL_VARIABLE_TYPE_PTR(bool_cvt);
  */
 typedef int arr3_int[3];
 DECLARE_CHANNEL_VARIABLE_TYPE(arr3_int, int *, 4);
-DECLARE_CHANNEL_VARIABLE_TYPE_PTR(arr3_int);
+DEFINE_CHANNEL_VARIABLE_TYPE_PTR(arr3_int)
 
 /**
  * (Int, Int) data type
@@ -333,7 +353,7 @@ DECLARE_CHANNEL_VARIABLE_TYPE_PTR(arr3_int);
  */
 typedef struct { int left; int right; } tup2_int;
 DECLARE_CHANNEL_VARIABLE_TYPE(tup2_int, tup2_int *, 3);
-DECLARE_CHANNEL_VARIABLE_TYPE_PTR(tup2_int);
+DEFINE_CHANNEL_VARIABLE_TYPE_PTR(tup2_int)
 
 /**
  * Triggers: indicates that a write to a channel variable should schedule a

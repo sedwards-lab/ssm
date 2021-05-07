@@ -44,6 +44,7 @@ void initialize_unit(CVT(unit) *v)
 	v->later = later_unit;
 	v->triggers = NULL;
 	v->last_updated = now;
+	v->select = NULL; /* Nothing should ever try to access the unit value */
 	v->event_time = NO_EVENT_SCHEDULED;
 }
 
@@ -66,7 +67,7 @@ void initialize_unit(CVT(unit) *v)
 			unsched_event(cvt); \
 		v->last_updated = now; \
 		v->value = (payload_t) value; \
-		schedule_sensitive(cvt, prio, 0); \
+		schedule_sensitive(cvt->triggers, prio, 0); \
 	} \
 	static void later_##payload_t(cv_t *cvt, ssm_time_t then, const any_t value, sel_t _selector) \
 	{ \
@@ -84,9 +85,10 @@ void initialize_unit(CVT(unit) *v)
 		cvt->assign = assign_##payload_t;\
 		cvt->later = later_##payload_t;\
 		cvt->triggers = NULL; \
-		cvt->event_time = NO_EVENT_SCHEDULED; \
 		cvt->last_updated = now; \
 		cvt->value = init_value; \
+		cvt->select[0] = &cvt->value; \
+		cvt->event_time = NO_EVENT_SCHEDULED; \
 	}
 
 DEFINE_CHANNEL_VARIABLE_TYPE_VAL(int)
@@ -309,7 +311,7 @@ static void later_arr3_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t 
 	v->inner_time[selector] = then;
 
 	inner_queue_index_t hole = ++v->inner_queue[QUEUE_SIZE];
-	assert(hole <= arr3_sel_range); /* Don't overflow the queue */
+	assert(hole <= arr3_int_sel_range); /* Don't overflow the queue */
 	for (; hole > QUEUE_HEAD && v->inner_time[selector] < v->inner_time[v->inner_queue[hole >> 1]]; hole >>= 1)
 		v->inner_queue[hole] = v->inner_queue[hole >> 1];
 	v->inner_queue[hole] = selector;
@@ -330,9 +332,13 @@ void initialize_arr3_int(CVT(arr3_int) *v, const int *init_value)
 	v->assign = assign_arr3_int;
 	v->later = later_arr3_int;
 
+	v->select[0] = v->value;
+
 	/* Magic number 3 from size of array */
-	for (int i = 0; i < 3; i++)
+	for (int i = 0; i < 3; i++) {
 		v->value[i] = init_value[i];
+		v->select[i+1] = &v->value[i];
+	}
 
 	v->inner_queue[QUEUE_SIZE] = 0;
 	for (int i = 0; i < arr3_int_sel_range; i++) {
@@ -514,7 +520,7 @@ static void later_tup2_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t 
 	v->inner_time[selector] = then;
 
 	inner_queue_index_t hole = ++v->inner_queue[QUEUE_SIZE];
-	assert(hole <= arr3_sel_range); /* Don't overflow the queue */
+	assert(hole <= arr3_int_sel_range); /* Don't overflow the queue */
 	for (; hole > QUEUE_HEAD && v->inner_time[selector] < v->inner_time[v->inner_queue[hole >> 1]]; hole >>= 1)
 		v->inner_queue[hole] = v->inner_queue[hole >> 1];
 	v->inner_queue[hole] = selector;
@@ -537,6 +543,10 @@ void initialize_tup2_int(CVT(tup2_int) *v, const tup2_int *init_value)
 
 	v->value.left = init_value->left;
 	v->value.right = init_value->right;
+
+	v->select[0] = &v->value;
+	v->select[1] = &v->value.left;
+	v->select[2] = &v->value.right;
 
 	v->inner_queue[QUEUE_SIZE] = 0;
 	for (int i = 0; i < tup2_int_sel_range; i++) {

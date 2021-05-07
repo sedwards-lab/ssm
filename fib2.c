@@ -17,15 +17,15 @@ fib n &r
 typedef struct {
   ACTIVATION_RECORD_FIELDS;
 
-  cv_int_t n;       // Local variable
-  cv_int_t *r;      // Where we should write our result
-  cv_int_t r2;
+  int_cvt n;       // Local variable
+  ptr_int_cvt r;
+  int_cvt r2;
 } rar_fib_t;
 
 stepf_t step_fib;
 
 rar_fib_t *enter_fib(rar_t *cont, priority_t priority,
-		     depth_t depth, int n, cv_int_t *r)
+		     depth_t depth, int n, ptr_int_cvt r)
 {
   rar_fib_t *rar = (rar_fib_t *) enter(sizeof(rar_fib_t), step_fib, cont,
 				       priority, depth);
@@ -36,32 +36,33 @@ rar_fib_t *enter_fib(rar_t *cont, priority_t priority,
   return rar;
 }
 
-void step_fib(rar_t *act)  
+void step_fib(rar_t *act)
 {
-  rar_fib_t *rar = (rar_fib_t *) act;
-  switch (rar->pc) {    
-  case 0:
-    if (rar->n.value < 2) {
-      assign_int(rar->r, rar->priority, 1);
-      leave((rar_t *) rar, sizeof(rar_fib_t));
-      return;
-    }
-    { depth_t new_depth = rar->depth - 1; // 2 children
-      priority_t new_priority = rar->priority;
-      priority_t pinc = 1 << new_depth;
-      fork((rar_t *) enter_fib( (rar_t *) rar, new_priority, new_depth,
-				rar->n.value - 1, rar->r));
-      new_priority += pinc;
-      fork((rar_t *) enter_fib( (rar_t *) rar, new_priority, new_depth,
-				rar->n.value - 2, &rar->r2));  
-    }
-    rar->pc = 1;
-    return;
-  case 1:
-    assign_int(rar->r, rar->priority, rar->r->value + rar->r2.value );
-    leave((rar_t *) rar, sizeof(rar_fib_t));
-    return;
-  }
+	rar_fib_t *rar = (rar_fib_t *) act;
+	switch (rar->pc) {
+	case 0: {
+		if (rar->n.value < 2) {
+			rar->r.ptr->assign(rar->r.ptr, rar->priority, 1, rar->r.offset);
+			leave((rar_t *) rar, sizeof(rar_fib_t));
+			return;
+		}
+		depth_t new_depth = rar->depth - 1; // 2 children
+		priority_t new_priority = rar->priority;
+		priority_t pinc = 1 << new_depth;
+		fork((rar_t *) enter_fib( (rar_t *) rar, new_priority, new_depth,
+					rar->n.value - 1, rar->r));
+		new_priority += pinc;
+		fork((rar_t *) enter_fib( (rar_t *) rar, new_priority, new_depth,
+					rar->n.value - 2, ptr_of_int(&rar->r2)));
+		rar->pc = 1;
+		return;
+	}
+	case 1:
+		rar->r.ptr->assign(rar->r.ptr, rar->priority, *DEREF(int, rar->r) + rar->r2.value, rar->r.offset);
+		leave((rar_t *) rar, sizeof(rar_fib_t));
+		return;
+	}
+	assert(0);
 }
 
 void top_return(rar_t *cont)
@@ -70,14 +71,14 @@ void top_return(rar_t *cont)
 }
 
 int main(int argc, char *argv[])
-{  
-  cv_int_t result;
-  initialize_int(&result, 0);
-  int n = argc > 1 ? atoi(argv[1]) : 3;
+{
+	int_cvt result;
+	initialize_int(&result, 0);
+	int n = argc > 1 ? atoi(argv[1]) : 3;
 
-  rar_t top = { .step = top_return };
-  fork((rar_t *) enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT,
-			   n, &result));
+	rar_t top = { .step = top_return };
+	fork((rar_t *) enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT,
+			   n, ptr_of_int(&result)));
 
   now = 0;
   tick();
