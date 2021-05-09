@@ -9,7 +9,8 @@
 #include <limits.h>
 #include <assert.h>
 
-typedef uint64_t int64;
+typedef uint64_t uint64;
+typedef int64_t int64;
 
 /* A year is 31,536,000 seconds, which fits in 25 bits
    There are 1,000,000 microseconds in a second, which fits in 20 bits
