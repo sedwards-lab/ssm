@@ -11,6 +11,7 @@
 
 typedef uint64_t uint64;
 typedef int64_t int64;
+typedef uint8_t  uint8;
 
 /* A year is 31,536,000 seconds, which fits in 25 bits
    There are 1,000,000 microseconds in a second, which fits in 20 bits
