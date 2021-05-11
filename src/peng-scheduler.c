@@ -11,6 +11,10 @@
 
 peng_time_t now;
 
+#ifdef DEBUG
+uint64_t debug_count = 0;
+#endif
+
 extern inline void leave(act_t *, size_t);
 extern inline void leave_no_sched(act_t *, size_t);
 extern inline act_t *enter(size_t, stepf_t *,
@@ -243,7 +247,7 @@ void tick()
     (*var->update)(var);     // Update the value
 #ifdef DEBUG
     var->to_string(var, buffer, 24);
-    printf("event %lu value %s\n", now, buffer);
+    DEBUG_PRINT("event %lu value %s\n", now, buffer);
 #endif
     var->last_updated = now; // Remember that it was updated
     // Schedule all sensitive continuations
