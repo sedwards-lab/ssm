@@ -238,7 +238,7 @@ void tick()
   // everything sensitive to it
 
 #ifdef DEBUG
-  char buffer[24];
+  char buffer[50];
 #endif
 
   while ( event_queue_len > 0 && event_queue[1]->event_time == now ) {
@@ -246,7 +246,7 @@ void tick()
     
     (*var->update)(var);     // Update the value
 #ifdef DEBUG
-    var->to_string(var, buffer, 24);
+    var->to_string(var, buffer, 50);
     DEBUG_PRINT("event %lu value %s\n", now, buffer);
 #endif
     var->last_updated = now; // Remember that it was updated
