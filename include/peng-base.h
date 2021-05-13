@@ -118,6 +118,7 @@ extern void schedule_sensitive(sv_t *, priority_t);
 typedef sv_t sv_event_t;
 extern void initialize_event(sv_event_t *);
 extern void assign_event(sv_event_t *, priority_t);
+extern void dequeue_event(sv_t *var);
 extern void later_event(sv_t *, peng_time_t);
 
 

@@ -83,6 +83,9 @@ void enqueue_event(sv_t *var, peng_time_t then) {
 // Dequeue an event from the event queue. Assumes the element is present in the queue.
 void dequeue_event(sv_t *var) {
   assert(var);
+  if(var->event_time == NO_EVENT_SCHEDULED) {
+    return;
+  }
 
   event_queue_index_t i = 1;
   // this search can be made better, but it was not clear to me if the children
@@ -144,7 +147,6 @@ void sift_up(event_queue_index_t i) {
   }
 }
 
-
 void later_event(sv_t *var, peng_time_t then)
 {
   assert(var);
@@ -157,15 +159,8 @@ void later_event(sv_t *var, peng_time_t then)
     dequeue_event(var);
     enqueue_event(var, then);
   }
-//  printf("var->then = %lu\n", var->event_time);
-//  printf("event_queue_len = %d\n", event_queue_len);
 
   event_queue_index_t i = 1;
-//  while(i <= event_queue_len) {
-//    printf("event_queue[%d]->event_time = %lu\n", i, event_queue[i]->event_time);
-//    i++;
-//  }
-
 }
 
 void enqueue(act_t *cont)
