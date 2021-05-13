@@ -33,6 +33,14 @@ act_t *cont_queue[CONT_QUEUE_SIZE+1];
 event_queue_index_t event_queue_len = 0;
 sv_t *event_queue[EVENT_QUEUE_SIZE+1];
 
+#ifdef DEBUG
+int can_schedule(sv_t *var) {
+  if(var->event_time == NO_EVENT_SCHEDULED) {
+    return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
+  }
+}
+#endif
+
 void sensitize(sv_t *var, trigger_t *trigger)
 {
   assert(var);

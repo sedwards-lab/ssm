@@ -18,7 +18,7 @@ extern uint64_t limit;
     printf(__VA_ARGS__);       \
 }
 #else
-#define DEBUG_PRINT(x) while(0) {}
+#define DEBUG_PRINT(...) while(0) {}
 #endif
 
 #endif
