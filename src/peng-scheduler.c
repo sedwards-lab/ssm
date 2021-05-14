@@ -39,6 +39,10 @@ int can_schedule(sv_t *var) {
     return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
   }
 }
+
+int can_fork() {
+  return (cont_queue_len + 1 <= CONT_QUEUE_SIZE);
+}
 #endif
 
 void sensitize(sv_t *var, trigger_t *trigger)
