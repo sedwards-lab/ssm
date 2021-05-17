@@ -258,8 +258,15 @@ void tick()
 #endif
     var->last_updated = now; // Remember that it was updated
     // Schedule all sensitive continuations
-    for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next)
+    for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next) {
+#ifdef DEBUG
+      if(!can_fork()) {
+        printf("contqueue full\n");
+        exit(1);
+      }
+#endif
       enqueue(trigger->act);
+    }
 
     // Remove the earliest event from the queue
     var->event_time = NO_EVENT_SCHEDULED;
