@@ -1,13 +1,12 @@
 CC = gcc
 CFLAGS = -g -Wall -pedantic -std=c99
 
-EXE = fib fib2 fib3 counter counter2 clock onetwo
+EXE = fib
+# EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
 
 SSMLIB = ssm-types ssm-queue ssm-sched
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
-
-new: $(obj_SSMLIB)
 
 all : $(EXE)
 

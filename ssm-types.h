@@ -15,8 +15,14 @@
  */
 struct svt_ptr {
   struct sv *ptr;
-  sel_t offset;
+  sel_t selector;
 };
+
+#define PTR_ASSIGN(ptr_sv, prio, val)                                          \
+  (ptr_sv).ptr->vtable->assign((ptr_sv).ptr, prio, val, (ptr_sv).selector)
+
+#define PTR_OF_SV(sv)                                                          \
+  (struct svt_ptr) { .ptr = &(sv), .selector = 0 }
 
 /*** Unit type {{{
  *
@@ -46,7 +52,8 @@ extern void (*const initialize_unit)(unit_svt *);
     payload_t value;       /* Current value */                                 \
     payload_t later_value; /* Buffered value */                                \
   } payload_t##_svt;                                                           \
-  extern void initialize_##payload_t(payload_t##_svt *, payload_t)
+  extern void initialize_##payload_t(payload_t##_svt *, payload_t);            \
+  typedef struct svt_ptr ptr_##payload_t##_svt
 
 /**
  * Declare an aggregate scheduled variable type for payload type payload_t,

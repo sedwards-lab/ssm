@@ -96,6 +96,9 @@ struct svtable {
   void (*later)(struct sv *, ssm_time_t, const any_t, sel_t);
 
   /* TODO: selector -> byte offset table */
+#ifdef DEBUG
+  const char *type_name;
+#endif
 };
 
 /**
@@ -117,6 +120,9 @@ struct sv {
     ssm_time_t last_updated; /* When vtable->sel_max == 0 */
     sel_t later_selector;    /* Otherwise */
   } u;
+#ifdef DEBUG
+  const char *var_name;
+#endif
 };
 
 /**

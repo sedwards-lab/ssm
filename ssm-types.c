@@ -5,26 +5,12 @@
 
 #include "ssm-types.h"
 #include "ssm-queue.h" /* For managing inner queues */
-#include <stddef.h>    /* For offsetof */
 
 /**
  * Unit type "implementation", which uses underlying the pure event
  * implementation and nothing more.
  */
 void (*const initialize_unit)(unit_svt *) = &initialize_event;
-
-/**
- * Implementation of container_of that falls back to ISO C99 when GNU C is not
- * available (from https://stackoverflow.com/a/10269925/10497710)
- */
-#ifdef __GNUC__
-#define member_type(type, member) __typeof__(((type *)0)->member)
-#else
-#define member_type(type, member) const void
-#endif
-#define container_of(ptr, type, member)                                        \
-  ((type *)((char *)(member_type(type, member) *){ptr} -                       \
-            offsetof(type, member)))
 
 /**
  * Scalar definition helper macro
