@@ -5,6 +5,7 @@
    http://www.algolist.net/Data_structures/Binary_heap/Remove_minimum */
 
 #include "ssm.h"
+#include <stdio.h>
 
 ssm_time_t now;
 
@@ -148,13 +149,13 @@ void enqueue(rar_t *cont)
  *
  * FIXME: move docstring to declaration in header file, and actually document more.
  */
-void schedule_sensitive(trigger_t *trigger, priority_t priority, sel_t selector)
+void schedule_sensitive(cv_t *cvt, priority_t priority, sel_t selector)
 {
+	trigger_t *trigger = cvt->triggers;
 	for (; trigger; trigger = trigger->next)
-		if (trigger->rar->priority > priority) {
-			/* FIXME: check if selector is relevant */
-			enqueue(trigger->rar);
-		}
+		if (trigger->rar->priority > priority && trigger->start <= selector && selector < trigger->span)
+					/* if (!trigger->predicate || trigger->predicate(cvt)) */
+						enqueue(trigger->rar);
 }
 
 void fork(rar_t *rar)
@@ -176,8 +177,8 @@ void tick(void)
 
 		sel_t selector = var->selector; /* Save this because ->update() may clobber it */
 		var->update(var);
-		schedule_sensitive(var->triggers, 0, selector);
-		// ^TODO: using priority of 0 is ok, right?
+		schedule_sensitive(var, 0, selector);
+		// ^TODO: using priority of 0 is ok for waking up, right?
 
 		/* Remove the earliest event (var) from the queue, using it as our hole */
 		event_queue_index_t hole = QUEUE_HEAD;

@@ -91,7 +91,6 @@ typedef unsigned long any_t;
 
 typedef struct cv cv_t;			/* Forward-declared type name for generic channel variable */
 // FIXME: this macro doesn't work like I think it should; just remove it
-#define CVT(type_name) type_name##_cvt	/* Channel variable name mangler */
 typedef size_t sel_t;			/* Member selector for aggregate data types */
 #define BAD_SELECTOR ULONG_MAX		/* Poison value for selector queue */
 typedef struct trigger trigger_t;	/* Forward-declared type name for channel trigger list head */
@@ -105,14 +104,14 @@ typedef struct trigger trigger_t;	/* Forward-declared type name for channel trig
 	void (*later)(cv_t *, ssm_time_t, const any_t, sel_t);	/* See below */\
 	struct trigger *triggers;	/* List of sensitive continuations */\
 	sel_t selector;			/* Which element is being updated */\
-	ssm_time_t event_time 		/* Time at which the variable should be updated  */\
+	ssm_time_t event_time 		/* Time at which the variable should be updated */
 
 /**
  * "Base class" for channel variable
  */
 struct cv {
     CHANNEL_VARIABLE_FIELDS;
-    void *select;
+    void *select[1];
     /**^
      * The select field is used to obtain the address of each payload member.
      * In concrete implementations of cv_t, select will actually be an array of
@@ -125,14 +124,11 @@ struct cv {
      */
 };
 
-#define DEREF(type, e) (type *) (((void **) &(e).ptr->select)[(e).offset])
-
-
 // TODO: place these in protected header file
-extern void schedule_sensitive(trigger_t *, priority_t, sel_t);
+extern void schedule_sensitive(cv_t *, priority_t, sel_t);
 extern void sched_event(cv_t *var);
 extern void unsched_event(cv_t *var);
-
+#define event_on(x) 0
 /**
  * Here are some methods, functions, and variables that should be defined
  * alongside any variable:
@@ -250,9 +246,9 @@ typedef struct {
 	CHANNEL_VARIABLE_FIELDS;
 	void *select;
 	ssm_time_t last_updated;
-} CVT(unit);
+} unit_cvt;
 static const sel_t unit_sel_range = 1;
-extern void initialize_unit(CVT(unit) *v);
+extern void initialize_unit(unit_cvt *v);
 
 /**
  * Channel variable class declaration factory macros (wherein we rediscover C++ templates)
@@ -287,9 +283,9 @@ extern void initialize_unit(CVT(unit) *v);
 		payload_t later_value;			/* Buffered value */\
 		sel_t inner_queue[sel_range+1];		/* Prio queue for internal partial updates */\
 		ssm_time_t inner_time[sel_range];	/* When each internal component will be next updated */\
-	} CVT(payload_t); \
+	} payload_t##_cvt; \
 	static const sel_t payload_t##_sel_range = sel_range; \
-	extern void initialize_##payload_t(CVT(payload_t) *, const payload_param) \
+	extern void initialize_##payload_t(payload_t##_cvt *, const payload_param) \
 
 /**
  * Declare a generic channel variable type whose payload can be directly
@@ -304,9 +300,9 @@ extern void initialize_unit(CVT(unit) *v);
 		ssm_time_t last_updated;		/* When value was last updated */\
 		payload_t value;			/* Current value */\
 		payload_t later_value;			/* Buffered value */\
-	} CVT(payload_t); \
+	} payload_t##_cvt; \
 	static const sel_t payload_t##_sel_range = 1; \
-	extern void initialize_##payload_t(CVT(payload_t) *, payload_t) \
+	extern void initialize_##payload_t(payload_t##_cvt *, payload_t) \
 
 /**
  * Declare a pointer to a generic channel variable.
@@ -320,11 +316,17 @@ extern void initialize_unit(CVT(unit) *v);
 		cv_t *ptr;		/* Pointer to channel variable */\
 		sel_t offset;		/* Offset within ptr */\
 	} ptr_##pointee##_cvt; \
-	static inline ptr_##pointee##_cvt ptr_of_##pointee(CVT(pointee) *cvt) { \
+	static inline ptr_##pointee##_cvt ptr_of_##pointee(pointee##_cvt *cvt) { \
 		return (ptr_##pointee##_cvt) { (cv_t *) cvt, 0 }; \
 	}
+#define DEREF(type, e) (type *) ((e).ptr->select[(e).offset])
+#define PTR_ASSIGN(ptr_cvt, value, priority) (ptr_cvt).ptr->assign((ptr_cvt).ptr, priority, value, (ptr_cvt).offset)
+#define PTR_LATER(ptr_cvt, value, then) (ptr_cvt).ptr->later((ptr_cvt).ptr, then, value, (ptr_cvt).offset)
+
 
 /** Declare some basic data types */
+
+DEFINE_CHANNEL_VARIABLE_TYPE_PTR(unit)
 DECLARE_CHANNEL_VARIABLE_TYPE_VAL(int);
 DEFINE_CHANNEL_VARIABLE_TYPE_PTR(int)
 DECLARE_CHANNEL_VARIABLE_TYPE_VAL(bool);
@@ -363,23 +365,34 @@ DEFINE_CHANNEL_VARIABLE_TYPE_PTR(tup2_int)
  * the most complex "await" point.
  */
 struct trigger {
-  rar_t *rar;             /* Routine triggered by this channel variable */
+	trigger_t *next;	/* Next trigger sensitive to this variable, if any */
+	trigger_t **prev_ptr;	/* Pointer to ourself in previous list element */
 
-  trigger_t *next;       /* Next trigger sensitive to this variable, if any */
-  trigger_t **prev_ptr;  /* Pointer to ourself in previous list element */
-
-  // TODO: range or predicate
+	rar_t *rar;		/* Routine triggered by this channel variable */
+	sel_t start, span;
 };
 
 /* FIXME: move to a queue header file */
-// Event queue: variable updates scheduled for the future
+/* Event queue: variable updates scheduled for the future */
 typedef uint16_t event_queue_index_t; // Number in the queue/highest index
 extern event_queue_index_t event_queue_len;
 extern cv_t *event_queue[];
 
-extern void sensitize(cv_t *, trigger_t *); // Add a trigger to a variable
-extern void desensitize(trigger_t *);      // Remove a trigger from its variable
-
+/**
+ * Adds the trigger to the cvt, i.e., have rar->trigger to wait on cvt.
+ *
+ * Reponsible for:
+ * - Setting trigger->next and trigger->prev_ptr to place it in the cvt's
+ *   triggers list.
+ *
+ * Not responsible for:
+ * - Initializing anything else in the trigger.
+ */
+extern void sensitize(cv_t *, trigger_t *);	// Add a trigger to a variable
+/**
+ * Remove the trigger from its trigger list.
+ */
+extern void desensitize(trigger_t *);		// Remove a trigger from its variable
 
 // Continuation queue: scheduled for current instant
 typedef uint16_t cont_queue_index_t;  // Number in the queue/highest index

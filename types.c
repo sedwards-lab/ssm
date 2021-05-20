@@ -10,7 +10,7 @@ typedef uint16_t inner_queue_index_t;
 
 static void update_unit(cv_t *cvt)
 {
-	CVT(unit) *v = (CVT(unit) *) cvt;
+	unit_cvt *v = (unit_cvt *) cvt;
 	assert(v);
 	assert(v->event_time == now);
 	v->last_updated = now;
@@ -19,13 +19,13 @@ static void update_unit(cv_t *cvt)
 
 static void assign_unit(cv_t *cvt, priority_t prio, const any_t _value, sel_t _selector)
 {
-	CVT(unit) *v = (CVT(unit) *) cvt;
+	unit_cvt *v = (unit_cvt *) cvt;
 	assert(v);
 	assert(_selector == 0);
 	if (v->event_time != NO_EVENT_SCHEDULED)
 		unsched_event(cvt);
 	v->last_updated = now;
-	schedule_sensitive(cvt->triggers, prio, _selector);
+	schedule_sensitive(cvt, prio, _selector);
 }
 
 static void later_unit(cv_t *cvt, ssm_time_t then, const any_t value, sel_t _selector)
@@ -36,7 +36,7 @@ static void later_unit(cv_t *cvt, ssm_time_t then, const any_t value, sel_t _sel
 	sched_event(cvt);
 }
 
-void initialize_unit(CVT(unit) *v)
+void initialize_unit(unit_cvt *v)
 {
 	assert(v);
 	v->update = update_unit;
@@ -51,7 +51,7 @@ void initialize_unit(CVT(unit) *v)
 #define DEFINE_CHANNEL_VARIABLE_TYPE_VAL(payload_t) \
 	static void update_##payload_t(cv_t *cvt) \
 	{ \
-		CVT(payload_t) *v = (CVT(payload_t) *) cvt; \
+		payload_t##_cvt *v = (payload_t##_cvt *) cvt; \
 		assert(v); \
 		assert(v->event_time == now); \
 		v->last_updated = v->event_time; \
@@ -60,25 +60,26 @@ void initialize_unit(CVT(unit) *v)
 	} \
 	static void assign_##payload_t(cv_t *cvt, priority_t prio, const any_t value, sel_t _selector) \
 	{ \
-		CVT(payload_t) *v = (CVT(payload_t) *) cvt; \
+		payload_t##_cvt *v = (payload_t##_cvt *) cvt; \
 		assert(v); \
 		assert(_selector == 0); \
 		if (v->event_time != NO_EVENT_SCHEDULED) \
 			unsched_event(cvt); \
 		v->last_updated = now; \
 		v->value = (payload_t) value; \
-		schedule_sensitive(cvt->triggers, prio, 0); \
+		schedule_sensitive(cvt, prio, 0); \
 	} \
 	static void later_##payload_t(cv_t *cvt, ssm_time_t then, const any_t value, sel_t _selector) \
 	{ \
-		CVT(payload_t) *v = (CVT(payload_t) *) cvt; \
+		payload_t##_cvt *v = (payload_t##_cvt *) cvt; \
 		assert(v); \
 		assert(_selector == 0); \
 		v->later_value = (payload_t) value; \
 		v->event_time = then; \
+		v->selector = 0; \
 		sched_event(cvt); \
 	} \
-	void initialize_##payload_t(CVT(payload_t) *cvt, payload_t init_value) \
+	void initialize_##payload_t(payload_t##_cvt *cvt, payload_t init_value) \
 	{ \
 		assert(cvt); \
 		cvt->update = update_##payload_t;\
@@ -123,7 +124,7 @@ static void unsched_inner(sel_t *inner_queue, ssm_time_t *inner_time, inner_queu
 
 static void update_arr3_int(cv_t *cvt)
 {
-	CVT(arr3_int) *v = (CVT(arr3_int) *) cvt;
+	arr3_int_cvt *v = (arr3_int_cvt *) cvt;
 	assert(v);
 	assert(v->selector < arr3_int_sel_range);
 
@@ -218,7 +219,7 @@ static void update_arr3_int(cv_t *cvt)
  * mapping scheme, this will give us the range of children. We can just scan
  * through them linearly.
  */
-static void resolve_conflict_arr3_int(CVT(arr3_int) *v, sel_t selector)
+static void resolve_conflict_arr3_int(arr3_int_cvt *v, sel_t selector)
 {
 	/* Unnecessary defensive programming xD */
 	assert(v);
@@ -273,7 +274,7 @@ static void resolve_conflict_arr3_int(CVT(arr3_int) *v, sel_t selector)
 
 static void assign_arr3_int(cv_t *cvt, priority_t prio, const any_t value, sel_t selector)
 {
-	CVT(arr3_int) *v = (CVT(arr3_int) *) cvt;
+	arr3_int_cvt *v = (arr3_int_cvt *) cvt;
 	assert(v);
 	assert(selector < arr3_int_sel_range);
 	resolve_conflict_arr3_int(v, selector);
@@ -289,12 +290,12 @@ static void assign_arr3_int(cv_t *cvt, priority_t prio, const any_t value, sel_t
 		v->value[selector-1] = val;
 		v->last_updated[selector] = now;
 	}
-	schedule_sensitive(cvt->triggers, prio, selector);
+	schedule_sensitive(cvt, prio, selector);
 }
 
 static void later_arr3_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t selector)
 {
-	CVT(arr3_int) *v = (CVT(arr3_int) *) cvt;
+	arr3_int_cvt *v = (arr3_int_cvt *) cvt;
 	assert(v);
 	assert(selector < arr3_int_sel_range);
 	resolve_conflict_arr3_int(v, selector);
@@ -323,7 +324,7 @@ static void later_arr3_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t 
 	sched_event(cvt);
 }
 
-void initialize_arr3_int(CVT(arr3_int) *v, const int *init_value)
+void initialize_arr3_int(arr3_int_cvt *v, const int *init_value)
 {
 	assert(v);
 	v->triggers = NULL;
@@ -350,7 +351,7 @@ void initialize_arr3_int(CVT(arr3_int) *v, const int *init_value)
 
 static void update_tup2_int(cv_t *cvt)
 {
-	CVT(tup2_int) *v = (CVT(tup2_int) *) cvt;
+	tup2_int_cvt *v = (tup2_int_cvt *) cvt;
 	assert(v);
 	assert(v->selector < tup2_int_sel_range);
 
@@ -400,7 +401,7 @@ static void update_tup2_int(cv_t *cvt)
 	}
 }
 
-static void resolve_conflict_tup2_int(CVT(tup2_int) *v, sel_t selector)
+static void resolve_conflict_tup2_int(tup2_int_cvt *v, sel_t selector)
 {
 	/* Same implementation as arr3, both flat data structures */
 	assert(v);
@@ -455,12 +456,12 @@ static void resolve_conflict_tup2_int(CVT(tup2_int) *v, sel_t selector)
 
 static void assign_tup2_int(cv_t *cvt, priority_t prio, const any_t value, sel_t selector)
 {
-	CVT(tup2_int) *v = (CVT(tup2_int) *) cvt;
+	tup2_int_cvt *v = (tup2_int_cvt *) cvt;
 	assert(v);
 	assert(selector < tup2_int_sel_range);
 	resolve_conflict_tup2_int(v, selector);
 	
-	switch (v->selector) {
+	switch (selector) {
 	case 0: {
 		const tup2_int *val = (const tup2_int *) value;
 		v->value.left = val->left;
@@ -485,17 +486,17 @@ static void assign_tup2_int(cv_t *cvt, priority_t prio, const any_t value, sel_t
 		assert(0);
 		break;
 	}
-	schedule_sensitive(cvt->triggers, prio, selector);
+	schedule_sensitive(cvt, prio, selector);
 }
 
 static void later_tup2_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t selector)
 {
-	CVT(tup2_int) *v = (CVT(tup2_int) *) cvt;
+	tup2_int_cvt *v = (tup2_int_cvt *) cvt;
 	assert(v);
 	assert(selector < tup2_int_sel_range);
 	resolve_conflict_tup2_int(v, selector);
 
-	switch (v->selector) {
+	switch (selector) {
 	case 0: {
 		const tup2_int *val = (const tup2_int *) value;
 		v->later_value.left = val->left;
@@ -532,7 +533,7 @@ static void later_tup2_int(cv_t *cvt, ssm_time_t then, const any_t value, sel_t 
 	sched_event(cvt);
 }
 
-void initialize_tup2_int(CVT(tup2_int) *v, const tup2_int *init_value)
+void initialize_tup2_int(tup2_int_cvt *v, const tup2_int *init_value)
 {
 	assert(v);
 	v->triggers = NULL;

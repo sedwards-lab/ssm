@@ -42,7 +42,7 @@ void step_fib(rar_t *act)
 	switch (rar->pc) {
 	case 0: {
 		if (rar->n.value < 2) {
-			rar->r.ptr->assign(rar->r.ptr, rar->priority, 1, rar->r.offset);
+			PTR_ASSIGN(rar->r, 1, rar->priority);
 			leave((rar_t *) rar, sizeof(rar_fib_t));
 			return;
 		}
@@ -58,7 +58,7 @@ void step_fib(rar_t *act)
 		return;
 	}
 	case 1:
-		rar->r.ptr->assign(rar->r.ptr, rar->priority, *DEREF(int, rar->r) + rar->r2.value, rar->r.offset);
+		PTR_ASSIGN(rar->r, *DEREF(int, rar->r) + rar->r2.value, rar->priority);
 		leave((rar_t *) rar, sizeof(rar_fib_t));
 		return;
 	}
