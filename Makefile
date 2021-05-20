@@ -3,12 +3,15 @@ CFLAGS = -g -Wall -pedantic -std=c99
 
 EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
-SSMLIB = scheduler types
+
+SSMLIB = ssm-types ssm-queue ssm-sched
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
+
+new: $(obj_SSMLIB)
 
 all : $(EXE)
 
-$(obj_EXE) $(obj_SSMLIB) : ssm.h
+$(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h
 
 fib : fib.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^
