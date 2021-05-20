@@ -176,6 +176,10 @@ void desensitize(struct trigger *trigger) {
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
 
+void initialize_ssm(ssm_time_t start) {
+  now = start;
+}
+
 ssm_time_t tick() {
   /* For each queued event scheduled for the current time, remove the event from
    * the queue, update its variable, and schedule everything sensitive to it.

@@ -24,6 +24,10 @@ struct svt_ptr {
 #define PTR_OF_SV(sv)                                                          \
   (struct svt_ptr) { .ptr = &(sv), .selector = 0 }
 
+#define DEREF(type, ptr_sv)                                                    \
+  (type *)(((char *)(ptr_sv).ptr) +                                            \
+           (ptr_sv).ptr->vtable->sel_info[(ptr_sv).selector].offset)
+
 /*** Unit type {{{
  *
  * Unit types are just "pure" events without payloads, and are all that the

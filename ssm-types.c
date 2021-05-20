@@ -33,11 +33,16 @@ void (*const initialize_unit)(unit_svt *) = &initialize_event;
     v->later_value = (payload_t)value;                                         \
     later_event(sv, then);                                                     \
   }                                                                            \
+  static const struct sel_info sel_info_##payload_t[1] = {                     \
+      {.offset = offsetof(payload_t##_svt, value),                             \
+       .later_offset = offsetof(payload_t##_svt, later_value),                 \
+       .range = 1}};                                                           \
   static const struct svtable vtable_##payload_t = {                           \
+      .sel_max = 0,                                                            \
       .update = update_##payload_t,                                            \
       .assign = assign_##payload_t,                                            \
       .later = later_##payload_t,                                              \
-      .sel_max = 0,                                                            \
+      .sel_info = sel_info_##payload_t,                                        \
   };                                                                           \
   void initialize_##payload_t(payload_t##_svt *v, payload_t init_value) {      \
     initialize_event(&v->sv);                                                  \

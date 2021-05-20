@@ -17,6 +17,14 @@
  */
 #define SELECTOR_ROOT 0
 
+typedef unsigned long offset_t;
+/** Information about each selector. */
+struct sel_info {
+  offset_t offset;       /* Bytes from sv to payload at selector */
+  offset_t later_offset; /* Bytes from sv to buffered payload at selector */
+  sel_t range;           /* Number of children for selector */
+};
+
 /**
  * Used as untyped parameter value for data type-generic parameters.
  * FIXME: this is quite hacky.
@@ -25,6 +33,10 @@ typedef uint64_t any_t;
 
 /** The virtual table for each scheduled variable type. */
 struct svtable {
+#ifdef DEBUG
+  const char *type_name;
+#endif
+
   /**
    * The maximum selector value for the type. sel_max should be 0 if and only if
    * the scheduled variable type is atomic (its inner components cannot be
@@ -41,7 +53,7 @@ struct svtable {
    * - Setting event_time to when the channel variable should be next scheduled,
    *   or NO_EVENT_SCHEDULED if it shouldn't.
    * - Setting selector and later_value if sv should be rescheduled.
-   * 
+   *
    * Not responsible for:
    * - Restting selector or later_value if sv isn't being rescheduled; these
    *   will get overwritten later anyway.
@@ -95,10 +107,14 @@ struct svtable {
    */
   void (*later)(struct sv *, ssm_time_t, const any_t, sel_t);
 
-  /* TODO: selector -> byte offset table */
-#ifdef DEBUG
-  const char *type_name;
-#endif
+  /**
+   * Points to table of size sel_max, containing information about each member.
+   *
+   * TODO: this table can be inlined into the vtable to reduce one level of
+   * indirection, but that involves some pointer casting I don't want to do just
+   * yet.
+   */
+  const struct sel_info *sel_info;
 };
 
 /**
