@@ -257,7 +257,7 @@ void step_adder(struct act *act) {
       }
     }
   }
-  act_leave((struct act *)act, sizeof(act_adder_t));
+  act_leave(act, sizeof(act_adder_t));
 }
 
 stepf_t step_main;
@@ -318,7 +318,7 @@ void step_main(struct act *act) {
     act->pc = 1;
     return;
   case 1:
-    act_leave((struct act *)act, sizeof(act_adder_t));
+    act_leave(act, sizeof(act_adder_t));
     return;
   }
 }
