@@ -247,7 +247,7 @@ struct act *enter_adder(struct act *parent, priority_t priority, depth_t depth,
   a->static_link = static_link;
 
   sel_t selector = 0;
-  a->trigger1.act = a->trigger2.act = (struct act *)act;
+  a->trigger1.act = a->trigger2.act = act;
   a->trigger1.selector = a->trigger2.selector = selector;
   a->trigger1.span = a->static_link->q2.sv.vtable->sel_info[selector].span;
 
