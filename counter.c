@@ -90,10 +90,7 @@ struct act *enter_clk(struct act *parent, priority_t priority, depth_t depth,
   act_clk_t *a = container_of(act, act_clk_t, act);
   a->static_link = static_link;
 
-  sel_t selector = 0;
   a->trigger1.act = act;
-  a->trigger1.selector = selector;
-  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
 
   /*
    * Putting sensitize here is an optimization; more typical to put it at each
@@ -112,14 +109,12 @@ void step_clk(struct act *act) {
 
   switch (act->pc) {
   case 0:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1,
-                                         0);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1);
     act->pc = 1;
     return;
 
   case 1:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0,
-                                         0);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0);
     act->pc = 0;
     return;
   }
@@ -139,10 +134,7 @@ struct act *enter_dff1(struct act *parent, priority_t priority, depth_t depth,
 
   a->static_link = static_link;
 
-  sel_t selector = 0;
   a->trigger1.act = act;
-  a->trigger1.selector = selector;
-  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
   sensitize(&a->static_link->clk.sv, &a->trigger1);
   return act;
 }
@@ -158,7 +150,7 @@ void step_dff1(struct act *act) {
   case 0:
     if (a->static_link->clk.value)
       a->static_link->q1.sv.vtable->assign(
-          &a->static_link->q1.sv, act->priority, a->static_link->d1.value, 0);
+          &a->static_link->q1.sv, act->priority, a->static_link->d1.value);
     return;
   }
   assert(0);
@@ -177,10 +169,7 @@ struct act *enter_dff2(struct act *parent, priority_t priority, depth_t depth,
 
   a->static_link = static_link;
 
-  sel_t selector = 0;
   a->trigger1.act = act;
-  a->trigger1.selector = selector;
-  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
   sensitize(&a->static_link->clk.sv, &a->trigger1);
   return act;
 }
@@ -195,7 +184,7 @@ void step_dff2(struct act *act) {
   case 0:
     if (a->static_link->clk.value)
       a->static_link->q2.sv.vtable->assign(
-          &a->static_link->q2.sv, act->priority, a->static_link->d2.value, 0);
+          &a->static_link->q2.sv, act->priority, a->static_link->d2.value);
     return;
   }
   assert(0);
@@ -213,10 +202,7 @@ struct act *enter_inc(struct act *parent, priority_t priority, depth_t depth,
 
   a->static_link = static_link;
 
-  sel_t selector = 0;
   a->trigger1.act = act;
-  a->trigger1.selector = selector;
-  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
   sensitize(&a->static_link->clk.sv, &a->trigger1);
   return act;
 }
@@ -227,7 +213,7 @@ void step_inc(struct act *act) {
   switch (act->pc) {
   case 0:
     a->static_link->d2.sv.vtable->assign(&a->static_link->d2.sv, act->priority,
-                                         a->static_link->q2.value + 1, 0);
+                                         a->static_link->q2.value + 1);
     return;
   }
   assert(0);
@@ -246,12 +232,7 @@ struct act *enter_adder(struct act *parent, priority_t priority, depth_t depth,
 
   a->static_link = static_link;
 
-  sel_t selector = 0;
-  a->trigger1.act = a->trigger2.act = (struct act *)act;
-  a->trigger1.selector = a->trigger2.selector = selector;
-  a->trigger1.span = a->static_link->q2.sv.vtable->sel_info[selector].span;
-
-  a->trigger2.span = a->static_link->d2.sv.vtable->sel_info[selector].span;
+  a->trigger1.act = a->trigger2.act = act;
 
   sensitize(&a->static_link->q2.sv, &a->trigger1);
   sensitize(&a->static_link->d2.sv, &a->trigger2);
@@ -266,7 +247,7 @@ void step_adder(struct act *act) {
   case 0:
     a->static_link->d1.sv.vtable->assign(
         &a->static_link->d1.sv, act->priority,
-        a->static_link->q1.value + a->static_link->d2.value, 0);
+        a->static_link->q1.value + a->static_link->d2.value);
   }
 }
 

@@ -71,13 +71,11 @@ void step_second_clock(struct act *act) {
       later_event(&a->timer, now + 1 * TICKS_PER_SECOND);
 
       a->trigger1.act = act;
-      a->trigger1.selector = 0;
-      a->trigger1.span = 1;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(&a->timer, 0)) { /* @timer */
+      if (last_updated_event(&a->timer)) { /* @timer */
         desensitize(&a->trigger1);
       } else {
         return;
@@ -111,20 +109,18 @@ void step_report_seconds(struct act *act) {
 
     for (;;) { /* loop */
       a->trigger1.act = act;
-      a->trigger1.selector = 0;
-      a->trigger1.span = 1;
       sensitize(a->second_event.ptr, &a->trigger1); /* await @timer */
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(a->second_event.ptr, 0)) { /* @second_event */
+      if (last_updated_event(a->second_event.ptr)) { /* @second_event */
         desensitize(&a->trigger1);
       } else {
         return;
       }
 
       a->seconds.sv.vtable->assign(&a->seconds.sv, act->priority,
-                                   a->seconds.value + 1, 0);
+                                   a->seconds.value + 1);
 
       printf("%d\n", a->seconds.value);
     } /* end of loop */

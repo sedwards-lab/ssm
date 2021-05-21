@@ -98,21 +98,17 @@ void step_clock(struct act *act) {
 
   printf("clk = %d\n", *DEREF(bool, a->clk));
 
-  sel_t timer_selector = 0;
-  sel_t timer_span = 1;
   switch (act->pc) {
   case 0:
     for (;;) { /* loop */
       later_event(&a->timer, now + 100);
 
       a->trigger1.act = act;
-      a->trigger1.selector = timer_selector;
-      a->trigger1.span = timer_span;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(&a->timer, 0)) /* @timer */
+      if (last_updated_event(&a->timer)) /* @timer */
         desensitize(&a->trigger1);
       else
         return;
@@ -122,13 +118,11 @@ void step_clock(struct act *act) {
       later_event(&a->timer, now + 100);
 
       a->trigger1.act = act;
-      a->trigger1.selector = timer_selector;
-      a->trigger1.span = timer_span;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
       act->pc = 2;
       return;
     case 2:
-      if (last_updated_event(&a->timer, 0)) /* @timer */
+      if (last_updated_event(&a->timer)) /* @timer */
         desensitize(&a->trigger1);
       else
         return;
@@ -166,13 +160,11 @@ void step_dff(struct act *act) {
     for (;;) { /* loop */
       /* await clk == True */
       a->trigger1.act = act;
-      a->trigger1.selector = a->clk.selector;
-      a->trigger1.span = a->clk.ptr->vtable->sel_info[a->clk.selector].span;
       sensitize(a->clk.ptr, &a->trigger1);
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(a->clk.ptr, a->clk.selector) &&
+      if (last_updated_event(a->clk.ptr) &&
           *DEREF(bool, a->clk)) /* clk == true */
         desensitize(&a->trigger1);
       else
@@ -208,13 +200,11 @@ void step_inc(struct act *act) {
     for (;;) { /* loop */
       /* await @a */
       a->trigger1.act = act;
-      a->trigger1.selector = a->a.selector;
-      a->trigger1.span = a->a.ptr->vtable->sel_info[a->a.selector].span;
       sensitize(a->a.ptr, &a->trigger1);
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(a->a.ptr, a->a.selector)) { /* @a */
+      if (last_updated_event(a->a.ptr)) { /* @a */
         desensitize(&a->trigger1);
         PTR_ASSIGN(a->y, act->priority, *DEREF(int, a->a) + 1);
       } else {
@@ -250,19 +240,15 @@ void step_adder(struct act *act) {
     for (;;) { /* loop */
       /* await @a or @b */
       a->trigger1.act = act;
-      a->trigger1.selector = a->a.selector;
-      a->trigger1.span = a->a.ptr->vtable->sel_info[a->a.selector].span;
       sensitize(a->a.ptr, &a->trigger1);
 
       a->trigger2.act = act;
-      a->trigger2.selector = a->b.selector;
-      a->trigger2.span = a->b.ptr->vtable->sel_info[a->b.selector].span;
       sensitize(a->b.ptr, &a->trigger2);
       act->pc = 1;
       return;
     case 1:
-      if (last_updated_event(a->a.ptr, a->a.selector) ||
-          last_updated_event(a->b.ptr, a->b.selector)) { /* @a or @b */
+      if (last_updated_event(a->a.ptr) ||
+          last_updated_event(a->b.ptr)) { /* @a or @b */
         desensitize(&a->trigger1);
         desensitize(&a->trigger2);
         PTR_ASSIGN(a->y, act->priority, *DEREF(int, a->a) + *DEREF(int, a->b));

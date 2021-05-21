@@ -61,8 +61,6 @@ void step_mywait(struct act *act) {
   switch (act->pc) {
   case 0:
     a->trigger1.act = act;
-    a->trigger1.selector = a->r.selector;
-    a->trigger1.span = a->r.ptr->vtable->sel_info[a->r.selector].span;
     sensitize(a->r.ptr, &a->trigger1);
     act->pc = 1;
     return;

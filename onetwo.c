@@ -61,8 +61,6 @@ void step_one(struct act *act) {
   switch (act->pc) {
   case 0:
     a->trigger1.act = act;
-    a->trigger1.selector = 0;
-    a->trigger1.span = 0;
     sensitize(a->a.ptr, &a->trigger1);
 
     act->pc = 1;
@@ -95,8 +93,6 @@ void step_two(struct act *act) {
   switch (act->pc) {
   case 0:
     a->trigger1.act = act;
-    a->trigger1.selector = 0;
-    a->trigger1.span = 0;
     sensitize(a->a.ptr, &a->trigger1);
     act->pc = 1;
     return;
@@ -130,7 +126,7 @@ void step_main(struct act *act) {
   switch (act->pc) {
   case 0: {
     /* We could initialize a->a here, but no need */
-    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10, 0);
+    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10);
 
     depth_t new_depth = act->depth - 1; /* 2 children */
     priority_t new_priority = act->priority;
