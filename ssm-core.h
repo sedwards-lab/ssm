@@ -15,10 +15,16 @@
 #include <stdio.h>
 #endif
 
-/** Logical timestamps: assumed never to overflow */
+/** Logical microsecond timestamps: assumed never to overflow */
 typedef uint64_t ssm_time_t;
 
-/** 32-bit thread priority */
+/** ssm_time_t counts microseconds */
+#define TICKS_PER_SECOND 1000000
+
+/** Scheduling an event for this time is the same as unscheduling it. */
+#define NO_EVENT_SCHEDULED ULONG_MAX
+
+/** Thread priority */
 typedef uint32_t priority_t;
 
 /** TODO: docstring */
@@ -39,9 +45,6 @@ extern ssm_time_t now;
 
 /** Member selector for aggregate data types. */
 typedef uint16_t sel_t;
-
-/** Scheduling an event for this time is the same as unscheduling it. */
-#define NO_EVENT_SCHEDULED ULONG_MAX
 
 /*** Forward struct declarations ***/
 
