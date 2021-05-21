@@ -1,8 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "ssm.h"
+
+#include "ssm-act.h"
+#include "ssm-runtime.h"
+#include "ssm-types.h"
 
 /*  Synchronous counter example, like scheduler-1/counter3.c)
+ *
+ *  Note that this implementation uses static links to access variables in the
+ *  parent process, rather than using pointers
 
 fork
   loop
@@ -23,332 +29,303 @@ fork
   loop
     await
       @q2 or @d2: d1 = q1 + d2
-
-
-
-How do you check @q2?   Any assignment set the event_time?
-Probably need another time stamp in the variable: indicates the instant in which
-the variable was last updated
-
-    await
-      x != lastx:     Syntactic sugar for this?
-        lastx = x
-
-
-
-    await
-       expr:
-         code
-         code
-       expr:
-         code
-         code
-
-    await expr: code
-
-    await expr
-
 */
 
 typedef struct {
-	ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
-	int_cvt clk;
-	int_cvt d1;
-	int_cvt q1;
-	int_cvt d2;
-	int_cvt q2;
+  i32_svt clk;
+  i32_svt d1;
+  i32_svt q1;
+  i32_svt d2;
+  i32_svt q2;
 } act_main_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
   act_main_t *static_link;
-  trigger_t trigger1;
+  struct trigger trigger1;
 } act_clk_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
   act_main_t *static_link;
-  trigger_t trigger1;
+  struct trigger trigger1;
 } act_dff1_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
   act_main_t *static_link;
-  trigger_t trigger1;
+  struct trigger trigger1;
 } act_dff2_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
   act_main_t *static_link;
-  trigger_t trigger1;
+  struct trigger trigger1;
 } act_inc_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
   act_main_t *static_link;
-  trigger_t trigger1;
-  trigger_t trigger2;
+  struct trigger trigger1;
+  struct trigger trigger2;
 } act_adder_t;
-
 
 stepf_t step_clk;
 
-// Create a new activation for clk
-act_clk_t *enter_clk(rar_t *parent, priority_t priority,
-		depth_t depth, act_main_t *static_link)
-{
-	assert(parent);
-	assert(static_link);
-	act_clk_t *act = (act_clk_t *) enter(sizeof(act_clk_t), step_clk, parent,
-				priority, depth);
-	act->static_link = static_link;
-	act->trigger1.rar = (rar_t *) act;
-	act->trigger1.start = 0;
-	act->trigger1.span = int_sel_range;
+/* Create a new activation for clk */
+struct act *enter_clk(struct act *parent, priority_t priority, depth_t depth,
+                      act_main_t *static_link) {
+  assert(parent);
+  assert(static_link);
 
-	// Putting sensitize here is an optimization; more typical to put it at each "await" site
-	sensitize((cv_t *) &(act->static_link->clk), &(act->trigger1));
+  struct act *act =
+      act_enter(sizeof(act_clk_t), step_clk, parent, priority, depth);
+  act_clk_t *a = container_of(act, act_clk_t, act);
+  a->static_link = static_link;
 
-	return act;
+  sel_t selector = 0;
+  a->trigger1.act = act;
+  a->trigger1.selector = selector;
+  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
+
+  /*
+   * Putting sensitize here is an optimization; more typical to put it at each
+   * "await" site
+   */
+  sensitize(&a->static_link->clk.sv, &a->trigger1);
+
+  return act;
 }
 
-void step_clk(rar_t *cont)
-{
-	act_clk_t *act = (act_clk_t *) cont;
+void step_clk(struct act *act) {
+  act_clk_t *a = container_of(act, act_clk_t, act);
 
-	// printf("step_clk @%d\n", act->pc);
-	printf("clk = %d\n", act->static_link->clk.value);
+  /* printf("step_clk @%d\n", act->pc); */
+  printf("clk = %d\n", a->static_link->clk.value);
 
-	switch (act->pc) {
-	case 0:
-		act->static_link->clk.later((cv_t *) &act->static_link->clk, now + 100, 1, 0);
-		act->pc = 1;
-		return;
+  switch (act->pc) {
+  case 0:
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1,
+                                         0);
+    act->pc = 1;
+    return;
 
-	case 1:
-		act->static_link->clk.later((cv_t *) &act->static_link->clk, now + 100, 0, 0);
-		act->pc = 0;
-		return;
-	}
-	assert(0);
+  case 1:
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0,
+                                         0);
+    act->pc = 0;
+    return;
+  }
+  assert(0);
 }
-
 
 stepf_t step_dff1;
 
-act_dff1_t *enter_dff1(rar_t *parent, priority_t priority,
-		     depth_t depth, act_main_t *static_link)
-{
-	assert(parent);
-	assert(static_link);
-	act_dff1_t *act = (act_dff1_t *) enter(sizeof(act_dff1_t), step_dff1, parent,
-					 priority, depth);
-	act->static_link = static_link;
-	act->trigger1.rar = (rar_t *) act;
-	act->trigger1.start = 0;
-	act->trigger1.span = int_sel_range;
+struct act *enter_dff1(struct act *parent, priority_t priority, depth_t depth,
+                       act_main_t *static_link) {
+  assert(parent);
+  assert(static_link);
 
-	// Putting sensitize here is an optimization; more typical to put it at
-	// each "await" site
-	sensitize((cv_t *) &(act->static_link->clk), &(act->trigger1));
+  struct act *act =
+      act_enter(sizeof(act_dff1_t), step_dff1, parent, priority, depth);
+  act_dff1_t *a = container_of(act, act_dff1_t, act);
 
-	return act;
+  a->static_link = static_link;
+
+  sel_t selector = 0;
+  a->trigger1.act = act;
+  a->trigger1.selector = selector;
+  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
+  sensitize(&a->static_link->clk.sv, &a->trigger1);
+  return act;
 }
 
-void step_dff1(rar_t *cont)
-{
-	act_dff1_t *act = (act_dff1_t *) cont;
+void step_dff1(struct act *act) {
+  act_dff1_t *a = container_of(act, act_dff1_t, act);
 
-	// printf("step_dff1 @%d\n", act->pc);
-	printf("q1 = %d d1 = %d\n",
-	act->static_link->q1.value,
-	act->static_link->d1.value);
+  /* printf("step_dff1 @%d\n", act->pc); */
+  printf("q1 = %d d1 = %d\n", a->static_link->q1.value,
+         a->static_link->d1.value);
 
-	switch (act->pc) {
-	case 0:
-		if (act->static_link->clk.value)
-			act->static_link->q1.assign((cv_t *) &act->static_link->q1, act->priority, act->static_link->d1.value, 0);
-		return;
-	}
-	assert(0);
+  switch (act->pc) {
+  case 0:
+    if (a->static_link->clk.value)
+      a->static_link->q1.sv.vtable->assign(
+          &a->static_link->q1.sv, act->priority, a->static_link->d1.value, 0);
+    return;
+  }
+  assert(0);
 }
-
 
 stepf_t step_dff2;
 
-act_dff2_t *enter_dff2(rar_t *parent, priority_t priority,
-		       depth_t depth, act_main_t *static_link)
-{
-	assert(parent);
-	assert(static_link);
-	act_dff2_t *act = (act_dff2_t *) enter(sizeof(act_dff2_t), step_dff2, parent,
-					 priority, depth);
-	act->static_link = static_link;
-	act->trigger1.rar = (rar_t *) act;
-	act->trigger1.start = 0;
-	act->trigger1.span = int_sel_range;
+struct act *enter_dff2(struct act *parent, priority_t priority, depth_t depth,
+                       act_main_t *static_link) {
+  assert(parent);
+  assert(static_link);
 
-	// Putting sensitize here is an optimization; more typical to put it at
-	// each "await" site
-	sensitize((cv_t *) &(act->static_link->clk), &(act->trigger1));
+  struct act *act =
+      act_enter(sizeof(act_dff2_t), step_dff2, parent, priority, depth);
+  act_dff2_t *a = container_of(act, act_dff2_t, act);
 
-	return act;
+  a->static_link = static_link;
+
+  sel_t selector = 0;
+  a->trigger1.act = act;
+  a->trigger1.selector = selector;
+  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
+  sensitize(&a->static_link->clk.sv, &a->trigger1);
+  return act;
 }
 
-void step_dff2(rar_t *cont)
-{
-	act_dff2_t *act = (act_dff2_t *) cont;
+void step_dff2(struct act *act) {
+  act_dff2_t *a = container_of(act, act_dff2_t, act);
 
-	// printf("step_dff2 @%d\n", act->pc);
-	printf("q2 = %d d2 = %d\n",
-	 act->static_link->q2.value,
-	 act->static_link->d2.value);
-	switch (act->pc) {
-	case 0:
-		if (act->static_link->clk.value)
-			act->static_link->q2.assign((cv_t *) &act->static_link->q2, act->priority, act->static_link->d2.value, 0);
-		return;
-	}
-	assert(0);
+  /* printf("step_dff2 @%d\n", act->pc); */
+  printf("q2 = %d d2 = %d\n", a->static_link->q2.value,
+         a->static_link->d2.value);
+  switch (act->pc) {
+  case 0:
+    if (a->static_link->clk.value)
+      a->static_link->q2.sv.vtable->assign(
+          &a->static_link->q2.sv, act->priority, a->static_link->d2.value, 0);
+    return;
+  }
+  assert(0);
 }
-
 
 stepf_t step_inc;
 
-act_inc_t *enter_inc(rar_t *parent, priority_t priority,
-		     depth_t depth, act_main_t *static_link)
-{
-	assert(parent);
-	assert(static_link);
+struct act *enter_inc(struct act *parent, priority_t priority, depth_t depth,
+                      act_main_t *static_link) {
+  assert(parent);
+  assert(static_link);
+  struct act *act =
+      act_enter(sizeof(act_inc_t), step_inc, parent, priority, depth);
+  act_inc_t *a = container_of(act, act_inc_t, act);
 
-	act_inc_t *act = (act_inc_t *) enter(sizeof(act_inc_t), step_inc, parent,
-				priority, depth);
-	act->static_link = static_link;
-	act->trigger1.rar = (rar_t *) act;
-	act->trigger1.start = 0;
-	act->trigger1.span = int_sel_range;
+  a->static_link = static_link;
 
-	sensitize((cv_t *) &act->static_link->q2, &act->trigger1);
-	return act;
+  sel_t selector = 0;
+  a->trigger1.act = act;
+  a->trigger1.selector = selector;
+  a->trigger1.span = a->static_link->clk.sv.vtable->sel_info[selector].span;
+  sensitize(&a->static_link->clk.sv, &a->trigger1);
+  return act;
 }
 
-void step_inc(rar_t *cont)
-{
-	act_inc_t *act = (act_inc_t *) cont;
+void step_inc(struct act *act) {
+  act_inc_t *a = container_of(act, act_inc_t, act);
 
-	switch (act->pc) {
-	case 0:
-		act->static_link->d2.assign((cv_t *) &act->static_link->d2, act->priority, act->static_link->q2.value + 1, 0);
-		return;
-	}
-	assert(0);
+  switch (act->pc) {
+  case 0:
+    a->static_link->d2.sv.vtable->assign(&a->static_link->d2.sv, act->priority,
+                                         a->static_link->q2.value + 1, 0);
+    return;
+  }
+  assert(0);
 }
 
 stepf_t step_adder;
 
-act_adder_t *enter_adder(rar_t *parent, priority_t priority,
-			 depth_t depth, act_main_t *static_link)
-{
-	assert(parent);
-	assert(static_link);
+struct act *enter_adder(struct act *parent, priority_t priority, depth_t depth,
+                        act_main_t *static_link) {
+  assert(parent);
+  assert(static_link);
 
-	act_adder_t *act = (act_adder_t *) enter(sizeof(act_adder_t), step_adder,
-					parent, priority, depth);
-	act->static_link = static_link;
+  struct act *act =
+      act_enter(sizeof(act_adder_t), step_adder, parent, priority, depth);
+  act_adder_t *a = container_of(act, act_adder_t, act);
 
-	act->trigger1.rar = act->trigger2.rar = (rar_t *) act;
-	act->trigger1.start = act->trigger2.start = 0;
-	act->trigger1.span = act->trigger2.span = int_sel_range;
-	sensitize((cv_t *) &act->static_link->q2, &act->trigger1);
-	sensitize((cv_t *) &act->static_link->d2, &act->trigger2);
+  a->static_link = static_link;
 
-	return act;
+  sel_t selector = 0;
+  a->trigger1.act = a->trigger2.act = (struct act *)act;
+  a->trigger1.selector = a->trigger2.selector = selector;
+  a->trigger1.span = a->static_link->q2.sv.vtable->sel_info[selector].span;
+
+  a->trigger2.span = a->static_link->d2.sv.vtable->sel_info[selector].span;
+
+  sensitize(&a->static_link->q2.sv, &a->trigger1);
+  sensitize(&a->static_link->d2.sv, &a->trigger2);
+
+  return act;
 }
 
-void step_adder(rar_t *cont)
-{
-	act_adder_t *act = (act_adder_t *) cont;
+void step_adder(struct act *act) {
+  act_adder_t *a = container_of(act, act_adder_t, act);
 
-	switch (act->pc) {
-	case 0:
-		act->static_link->d1.assign((cv_t *) &act->static_link->d1, act->priority, act->static_link->q1.value + act->static_link->d2.value, 0);
-	}
+  switch (act->pc) {
+  case 0:
+    a->static_link->d1.sv.vtable->assign(
+        &a->static_link->d1.sv, act->priority,
+        a->static_link->q1.value + a->static_link->d2.value, 0);
+  }
 }
-
-
 
 stepf_t step_main;
 
-// Create a new activation record for main
-act_main_t *enter_main(rar_t *parent, priority_t priority,
-		depth_t depth)
-{
-	act_main_t *act = (act_main_t *) enter(sizeof(act_main_t), step_main, parent,
-				priority, depth);
+/* Create a new activation record for main */
+struct act *enter_main(struct act *parent, priority_t priority, depth_t depth) {
+  struct act *act =
+      act_enter(sizeof(act_main_t), step_main, parent, priority, depth);
+  act_main_t *a = container_of(act, act_main_t, act);
 
-	// Initialize managed variables
-	initialize_int(&(act->clk), 0);
-	initialize_int(&(act->d1), 0);
-	initialize_int(&(act->q1), 0);
-	initialize_int(&(act->d2), 0);
-	initialize_int(&(act->q2), 0);
-	return act;
+  /* Initialize managed variables */
+  initialize_i32(&a->clk, 0);
+  initialize_i32(&a->d1, 0);
+  initialize_i32(&a->q1, 0);
+  initialize_i32(&a->d2, 0);
+  initialize_i32(&a->q2, 0);
+  return act;
 }
 
-void step_main(rar_t *cont)
-{
-	act_main_t *act = (act_main_t *) cont;
-	depth_t new_depth;
-	priority_t pinc;
+void step_main(struct act *act) {
+  act_main_t *a = container_of(act, act_main_t, act);
+  depth_t new_depth;
+  priority_t pinc;
 
-	switch (act->pc) {
-	case 0:
-		new_depth = act->depth - 3; // Make space for 8 children
-		pinc = 1 << new_depth;    // priority increment for each thread
-		fork((rar_t *) enter_clk((rar_t *) act,
-				 act->priority + 0 * pinc, new_depth, act));
-		fork((rar_t *) enter_dff1((rar_t *) act,
-					act->priority + 1 * pinc, new_depth, act));
-		fork((rar_t *) enter_dff2((rar_t *) act,
-					act->priority + 2 * pinc, new_depth, act));
-		fork((rar_t *) enter_inc((rar_t *) act,
-					act->priority + 3 * pinc, new_depth, act));
-		fork((rar_t *) enter_adder((rar_t *) act,
-					act->priority + 4 * pinc, new_depth, act));
-		act->pc = 1;
-		return;
-	case 1:
-		leave((rar_t *) act, sizeof(act_main_t));
-		return;
-	}
-	assert(0);
+  switch (act->pc) {
+  case 0:
+    new_depth = act->depth - 3; // Make space for 8 children
+    pinc = 1 << new_depth;      // priority increment for each thread
+    act_fork(enter_clk(act, act->priority + 0 * pinc, new_depth, a));
+    act_fork(enter_dff1(act, act->priority + 1 * pinc, new_depth, a));
+    act_fork(enter_dff2(act, act->priority + 2 * pinc, new_depth, a));
+    act_fork(enter_inc(act, act->priority + 3 * pinc, new_depth, a));
+    act_fork(enter_adder(act, act->priority + 4 * pinc, new_depth, a));
+    act->pc = 1;
+    return;
+  case 1:
+    act_leave(act, sizeof(act_main_t));
+    return;
+  }
+  assert(0);
 }
 
-void main_return(rar_t *cont)
-{
-	return;
-}
+void main_return(struct act *cont) { return; }
 
-int main(int argc, char *argv[])
-{
-	ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 1000;
+int main(int argc, char *argv[]) {
+  ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
 
-	rar_t top = { .step = main_return };
-	act_main_t *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
-	fork((rar_t *) act);
+  initialize_ssm(0);
 
-	tick();
+  struct act top = {.step = main_return};
+  struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
+  act_fork(act);
 
-	while (event_queue_len > 0 && now < stop_at) {
-		now = event_queue[1]->event_time;
-		printf("now %lu\n", now);
-		tick();
-	}
-	return 0;
+  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
+       stop_at--, next = tick())
+    printf("next %lu\n", now);
+
+  /* We don't free() allocated memory before exiting, so we will leak memory */
+
+  return 0;
 }

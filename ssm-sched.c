@@ -60,7 +60,7 @@ static void update_event(struct sv *sv) {
     /* Non-unit type, so we need to call update method to update payload */
     selector = sv->vtable->update(sv);
 
-  if (!selector && sv->vtable->sel_max == SELECTOR_ROOT) {
+  if (!(sv->vtable && sv->vtable->sel_max > SELECTOR_ROOT)) {
     /* Atomic or unit type; update its last_updated and later_time fields */
     sv->later_time = NO_EVENT_SCHEDULED;
     sv->u.last_updated = sv->later_time;
@@ -130,6 +130,15 @@ void later_event(struct sv *sv, ssm_time_t then) {
     sv->later_time = then;
     requeue_event(event_queue, &event_queue_len, idx);
   }
+}
+
+ssm_time_t last_updated_event(struct sv *sv, sel_t selector) {
+  if (sv->vtable && sv->vtable->sel_max > SELECTOR_ROOT) {
+    /* FIXME: implement this for aggregate types */
+    assert(0);
+  }
+
+  return sv->u.last_updated;
 }
 
 /*** Events API }}} ***/

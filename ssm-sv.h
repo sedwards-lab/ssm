@@ -49,13 +49,16 @@ struct svtable {
    *
    * Reponsible for:
    * - Updating value (if there is one), according to later_value and selector.
-   * - Setting last_updated time(s) to now, according to selector.
+   * - Aggregate types: setting inner last_updated times to now, according to
+   *   selector.
    * - Setting event_time to when the channel variable should be next scheduled,
    *   or NO_EVENT_SCHEDULED if it shouldn't.
    * - Setting selector and later_value if sv should be rescheduled.
    *
    * Not responsible for:
-   * - Restting selector or later_value if sv isn't being rescheduled; these
+   * - Atomic types: setting last_updated time to now; this will be done by
+   *   the caller, in tick().
+   * - Resetting selector or later_value if sv isn't being rescheduled; these
    *   will get overwritten later anyway.
    */
   sel_t (*update)(struct sv *);
@@ -148,5 +151,6 @@ struct sv {
 extern void initialize_event(struct sv *);
 extern void assign_event(struct sv *, priority_t);
 extern void later_event(struct sv *, ssm_time_t);
+extern ssm_time_t last_updated_event(struct sv *, sel_t selector);
 
 #endif /* _SSM_SV_H */
