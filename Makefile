@@ -37,4 +37,4 @@ compile_commands.json: Makefile
 
 .PHONY : clean
 clean :
-	rm -rf *.o *.gch $(EXE)
+	rm -rf *.o *.gch vgcore.* $(EXE)
