@@ -33,10 +33,6 @@ typedef uint64_t any_t;
 
 /** The virtual table for each scheduled variable type. */
 struct svtable {
-#ifdef DEBUG
-  const char *type_name;
-#endif
-
   /**
    * The maximum selector value for the type. sel_max should be 0 if and only if
    * the scheduled variable type is atomic (its inner components cannot be
@@ -118,6 +114,8 @@ struct svtable {
    * yet.
    */
   const struct sel_info *sel_info;
+
+  const char *type_name;
 };
 
 /**
@@ -139,9 +137,7 @@ struct sv {
     ssm_time_t last_updated; /* When vtable->sel_max == 0 */
     sel_t later_selector;    /* Otherwise */
   } u;
-#ifdef DEBUG
   const char *var_name;
-#endif
 };
 
 /**

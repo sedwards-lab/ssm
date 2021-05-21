@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "ssm.h"
 
-/* 
+#include "ssm-act.h"
+#include "ssm-runtime.h"
+#include "ssm-types.h"
+
+/*
 one &a
   wait a
   a = a + 1
@@ -21,136 +24,141 @@ main
  */
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
-  cv_int_t *a;
-  trigger_t trigger1;
-} rar_one_t;
+  struct act act;
+  ptr_i32_svt a;
+  struct trigger trigger1;
+} act_one_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
-  cv_int_t *a;
-  trigger_t trigger1;
-} rar_two_t;
+  struct act act;
+  ptr_i32_svt a;
+  struct trigger trigger1;
+} act_two_t;
 
 typedef struct {
-  ACTIVATION_RECORD_FIELDS;
-  cv_int_t a;
-} rar_main_t;
+  struct act act;
+  i32_svt a;
+} act_main_t;
 
 stepf_t step_one;
 
-rar_one_t *enter_one(rar_t *cont, priority_t priority,
-		     depth_t depth, cv_int_t *a)
-{
-  rar_one_t *rar = (rar_one_t *) enter(sizeof(rar_one_t),
-					     step_one, cont,
-					     priority, depth);
-  rar->trigger1.rar = (rar_t *) rar;
-  rar->a = a;
+struct act *enter_one(struct act *cont, priority_t priority, depth_t depth,
+                      ptr_i32_svt a) {
+  struct act *act =
+      act_enter(sizeof(act_one_t), step_one, cont, priority, depth);
+  act_one_t *ac = container_of(act, act_one_t, act);
 
-  return rar;
+  ac->a = a;
+#ifdef DEBUG
+  act->act_name = "one";
+#endif
+
+  return act;
 }
 
-void step_one(rar_t *act)  
-{
-  rar_one_t *rar = (rar_one_t *) act;
-  switch (rar->pc) {
+void step_one(struct act *act) {
+  act_one_t *a = container_of(act, act_one_t, act);
+  switch (act->pc) {
   case 0:
-    sensitize((cv_t *) rar->a, &rar->trigger1);
-    rar->pc = 1;
+    a->trigger1.act = act;
+    a->trigger1.selector = 0;
+    a->trigger1.span = 0;
+    sensitize(a->a.ptr, &a->trigger1);
+
+    act->pc = 1;
     return;
   case 1:
-    desensitize(&rar->trigger1);
-    assign_int(rar->a, rar->priority, rar->a->value + 4);
-    leave((rar_t *) rar, sizeof(rar_one_t));
+    desensitize(&a->trigger1);
+    PTR_ASSIGN(a->a, act->priority, *DEREF(int, a->a) + 1);
+    printf("leaving step_one\n");
+    act_leave(act, sizeof(act_one_t));
     return;
   }
 }
-
-
 
 stepf_t step_two;
 
-rar_two_t *enter_two(rar_t *cont, priority_t priority,
-		     depth_t depth, cv_int_t *a)
-{
-  rar_two_t *rar = (rar_two_t *) enter(sizeof(rar_two_t),
-					     step_two, cont,
-					     priority, depth);
-  rar->trigger1.rar = (rar_t *) rar;
-  rar->a = a;
-
-  return rar;
+struct act *enter_two(struct act *cont, priority_t priority, depth_t depth,
+                      ptr_i32_svt a) {
+  struct act *act =
+      act_enter(sizeof(act_two_t), step_two, cont, priority, depth);
+  act_two_t *ac = container_of(act, act_two_t, act);
+  ac->a = a;
+#ifdef DEBUG
+  act->act_name = "two";
+#endif
+  return act;
 }
 
-void step_two(rar_t *act)  
-{
-  rar_two_t *rar = (rar_two_t *) act;
-  switch (rar->pc) {
+void step_two(struct act *act) {
+  act_two_t *a = container_of(act, act_two_t, act);
+  switch (act->pc) {
   case 0:
-    sensitize((cv_t *) rar->a, &rar->trigger1);
-    rar->pc = 1;
+    a->trigger1.act = act;
+    a->trigger1.selector = 0;
+    a->trigger1.span = 0;
+    sensitize(a->a.ptr, &a->trigger1);
+    act->pc = 1;
     return;
   case 1:
-    desensitize(&rar->trigger1);
-    assign_int(rar->a, rar->priority, rar->a->value * 2);
-    leave((rar_t *) rar, sizeof(rar_two_t));
+    desensitize(&a->trigger1);
+    PTR_ASSIGN(a->a, act->priority, *DEREF(int, a->a) * 2);
+    printf("leaving step_two\n");
+    act_leave(act, sizeof(act_two_t));
     return;
   }
 }
-
 
 stepf_t step_main;
 
-rar_main_t *enter_main(rar_t *cont, priority_t priority,
-		     depth_t depth)
-{
-  rar_main_t *rar = (rar_main_t *) enter(sizeof(rar_main_t), step_main, cont,
-				       priority, depth);
-  initialize_int(&rar->a, 0);
+struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
+  struct act *act =
+      act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
+  act_main_t *a = container_of(act, act_main_t, act);
+  initialize_i32(&a->a, 0);
+  a->a.sv.var_name = "a";
 
-  return rar;
+#ifdef DEBUG
+  act->act_name = "main";
+#endif
+
+  return act;
 }
 
-void step_main(rar_t *act)  
-{
-  rar_main_t *rar = (rar_main_t *) act;
-  switch (rar->pc) {    
-  case 0:
-    later_int(&rar->a, now + 1, 1);
-    { depth_t new_depth = rar->depth - 1; // 2 children
-      priority_t new_priority = rar->priority;
-      priority_t pinc = 1 << new_depth;
-      fork((rar_t *) enter_one( (rar_t *) rar, new_priority, new_depth,
-				&rar->a));
-      new_priority += pinc;
-      fork((rar_t *) enter_two( (rar_t *) rar, new_priority, new_depth,
-				&rar->a));
-    }
-    rar->pc = 1;
+void step_main(struct act *act) {
+  act_main_t *a = container_of(act, act_main_t, act);
+  switch (act->pc) {
+  case 0: {
+    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10, 0);
+
+    depth_t new_depth = act->depth - 1; /* 2 children */
+    priority_t new_priority = act->priority;
+    priority_t pinc = 1 << new_depth;
+
+    act_fork(enter_one(act, new_priority, new_depth, PTR_OF_SV(a->a.sv)));
+    new_priority += pinc;
+
+    act_fork(enter_two(act, new_priority, new_depth, PTR_OF_SV(a->a.sv)));
+    act->pc = 1;
     return;
+  }
   case 1:
-    printf("a = %d\n", rar->a.value);
-    leave((rar_t *) rar, sizeof(rar_main_t));
+    printf("a = %d\n", a->a.value);
+    act_leave(act, sizeof(act_main_t));
     return;
   }
 }
 
-void top_return(rar_t *cont)
-{
-  return;
-}
+void top_return(struct act *cont) { return; }
 
-int main()
-{  
-  rar_t top = { .step = top_return };
-  fork((rar_t *) enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
+int main() {
+  initialize_ssm(0);
 
-  tick();
-  while (event_queue_len > 0) {
-    now = event_queue[1]->event_time;
-    tick();
-  }
-  
+  struct act top = {.step = top_return};
+  act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
+
+  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
+    printf("tick: next = %lu\n", next);
+
   return 0;
 }

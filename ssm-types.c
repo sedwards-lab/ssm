@@ -43,6 +43,7 @@ void (*const initialize_unit)(unit_svt *) = &initialize_event;
       .assign = assign_##payload_t,                                            \
       .later = later_##payload_t,                                              \
       .sel_info = sel_info_##payload_t,                                        \
+      .type_name = #payload_t,                                                 \
   };                                                                           \
   void initialize_##payload_t(payload_t##_svt *v, payload_t init_value) {      \
     initialize_event(&v->sv);                                                  \

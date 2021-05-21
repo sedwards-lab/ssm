@@ -19,7 +19,7 @@
 #include "ssm-core.h" /* for ssm_time_t */
 #include <stddef.h>   /* for size_t */
 
-/** Queue index type */
+/** Queue index type; these are 1-indexed*/
 typedef size_t idx_t;
 
 /** Priority queues start at index 1 */
@@ -35,18 +35,18 @@ typedef size_t idx_t;
 
 /*** Type-specialized queue operations ***/
 
-void enqueue_event(struct sv **event_queue, idx_t *queue_len,
+void enqueue_event(struct sv **event_queue, size_t *queue_len,
                    struct sv *to_insert);
-void dequeue_event(struct sv **event_queue, idx_t *queue_len, idx_t to_dequeue);
-void requeue_event(struct sv **event_queue, idx_t *queue_len, idx_t to_requeue);
-idx_t index_of_event(struct sv **event_queue, idx_t *queue_len,
+void dequeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_dequeue);
+void requeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_requeue);
+idx_t index_of_event(struct sv **event_queue, size_t *queue_len,
                     struct sv *to_find);
 
-void enqueue_act(struct act **act_queue, idx_t *queue_len,
+void enqueue_act(struct act **act_queue, size_t *queue_len,
                  struct act *to_insert);
-void dequeue_act(struct act **act_queue, idx_t *queue_len, idx_t to_dequeue);
-void requeue_act(struct act **act_queue, idx_t *queue_len, idx_t to_requeue);
-idx_t index_of_act(struct act **act_queue, idx_t *queue_len,
+void dequeue_act(struct act **act_queue, size_t *queue_len, idx_t to_dequeue);
+void requeue_act(struct act **act_queue, size_t *queue_len, idx_t to_requeue);
+idx_t index_of_act(struct act **act_queue, size_t *queue_len,
                   struct act *to_find);
 
 void enqueue_inner(ssm_time_t *inner_time, sel_t *inner_queue, sel_t to_insert);

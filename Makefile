@@ -1,8 +1,7 @@
 CC = gcc
-CFLAGS = -g -Wall -pedantic -std=c99
+CFLAGS = -g -Wall -pedantic -std=c99 # -DDEBUG
 
-EXE = fib fib2 fib3 counter counter2 clock
-# EXE = fib fib2 fib3 counter counter2 clock onetwo
+EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
 
 SSMLIB = ssm-types ssm-queue ssm-sched

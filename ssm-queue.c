@@ -13,13 +13,19 @@
 /*** Priority queue logic {{{ */
 
 /**
- * NOTE: Caller is responsible for incrementing queue_len before this.
+ * NOTE: Caller is responsible for incrementing queue_len *before* this.
  */
 static inline void enqueue(int (*compar)(void *, void *, void *), void *ctx,
                            void *(*get)(void *, idx_t),
                            void (*set)(void *, idx_t, void *), void *queue,
                            size_t queue_len, void *to_insert) {
-  idx_t hole = queue_len;
+  /*
+   * NOTE: queue_len is already 1 greater than the number of elements, so its value is
+   * 2 greater than the last element in a 0-indexed scheme. However, in idx_t's
+   * 1-indexed scheme, it is just 1 past the last element---where we want the
+   * hole to be.
+   */
+  idx_t hole = queue_len + 1 - QUEUE_HEAD;
   for (; hole > QUEUE_HEAD && compar(to_insert, get(queue, hole >> 1), ctx) < 0;
        hole >>= 1)
     set(queue, hole, get(queue, hole >> 1));
@@ -29,7 +35,7 @@ static inline void enqueue(int (*compar)(void *, void *, void *), void *ctx,
 
 /**
  * NOTE: to_insert must not already be in the queue, but queue_len should
- * already be large enough to accommodate new item
+ * already be large enough to accommodate new item.
  */
 static inline void fill_hole(int (*compar)(void *, void *, void *), void *ctx,
                              void *(*get)(void *, idx_t),
@@ -39,7 +45,7 @@ static inline void fill_hole(int (*compar)(void *, void *, void *), void *ctx,
     /* Find earlier of hole's two children */
     idx_t child = hole << 1; /* Left child */
 
-    if (child > queue_len)
+    if (queue_len <= child)
       /* Reached the bottom of minheap */
       break;
 
@@ -85,13 +91,13 @@ static void set_event(void *queue, idx_t idx, void *val) {
   q[idx] = *v;
 }
 
-void enqueue_event(struct sv **event_queue, idx_t *queue_len,
+void enqueue_event(struct sv **event_queue, size_t *queue_len,
                    struct sv *to_insert) {
   enqueue(compar_event, NULL, get_event, set_event, event_queue, ++*queue_len,
           &to_insert);
 }
 
-void dequeue_event(struct sv **event_queue, idx_t *queue_len, idx_t to_dequeue) {
+void dequeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_dequeue) {
   /*
    * We don't need to create a separate copy of the tail of the queue because
    * we decrement the queue_size before we call fill_hole, leaving tail beyond
@@ -102,14 +108,14 @@ void dequeue_event(struct sv **event_queue, idx_t *queue_len, idx_t to_dequeue) 
             to_dequeue, to_insert);
 }
 
-void requeue_event(struct sv **event_queue, idx_t *queue_len,
+void requeue_event(struct sv **event_queue, size_t *queue_len,
                    idx_t to_requeue) {
   struct sv *to_insert = event_queue[to_requeue];
   fill_hole(compar_event, NULL, get_event, set_event, event_queue, *queue_len,
             to_requeue, &to_insert);
 }
 
-idx_t index_of_event(struct sv **event_queue, idx_t *queue_len,
+idx_t index_of_event(struct sv **event_queue, size_t *queue_len,
                      struct sv *to_find) {
   for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
     if (event_queue[idx] == to_find)
@@ -142,13 +148,13 @@ static void set_act(void *queue, idx_t idx, void *val) {
   q[idx] = *v;
 }
 
-void enqueue_act(struct act **act_queue, idx_t *queue_len,
+void enqueue_act(struct act **act_queue, size_t *queue_len,
                  struct act *to_insert) {
   enqueue(compar_act, NULL, get_act, set_act, act_queue, ++*queue_len,
           &to_insert);
 }
 
-void dequeue_act(struct act **act_queue, idx_t *queue_len, idx_t to_dequeue) {
+void dequeue_act(struct act **act_queue, size_t *queue_len, idx_t to_dequeue) {
   /*
    * We don't need to create a separate copy of the tail of the queue because
    * we decrement the queue_size before we call fill_hole, leaving tail beyond
@@ -159,13 +165,13 @@ void dequeue_act(struct act **act_queue, idx_t *queue_len, idx_t to_dequeue) {
             to_dequeue, to_insert);
 }
 
-void requeue_act(struct act **act_queue, idx_t *queue_len, idx_t to_requeue) {
+void requeue_act(struct act **act_queue, size_t *queue_len, idx_t to_requeue) {
   struct act *to_insert = act_queue[to_requeue];
   fill_hole(compar_act, NULL, get_act, set_act, act_queue, *queue_len,
             to_requeue, &to_insert);
 }
 
-idx_t index_of_act(struct act **act_queue, idx_t *queue_len,
+idx_t index_of_act(struct act **act_queue, size_t *queue_len,
                    struct act *to_find) {
   for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
     if (act_queue[idx] == to_find)
