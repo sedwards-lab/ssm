@@ -74,14 +74,17 @@ void enqueue_event(sv_t *var, peng_time_t then) {
 
   // Initially insert new node at end, which breaks invariant
   event_queue_index_t i = ++event_queue_len;
-  //printf("inserting into %d var %p\n", i, var);
   var->event_time = then;
   assert (i <= EVENT_QUEUE_SIZE);
   event_queue[i] = var;
-//  for(event_queue_index_t index = 1; index <= event_queue_len; index++) {
-//    printf("enqueue_event event_queue[%d]->event_time = %lu\n", index, event_queue[index]->event_time);
-//  }
   sift_up(i);
+}
+
+sv_t* dequeue_minimum() {
+  sv_t *earliest = event_queue[1];
+  event_queue[1] = event_queue[event_queue_len--];
+  sift_down(1);
+  return earliest;
 }
 
 // Dequeue an event from the event queue. Assumes the element is present in the queue.
@@ -104,32 +107,30 @@ void dequeue_event(sv_t *var) {
 
 // sift the element at index i down to its proper place.
 void sift_down(event_queue_index_t i) {
-  event_queue_index_t parent = i;
-  
-  // while we've not reached the end of the array
-  while(parent < event_queue_len) {
-    sv_t *elem = event_queue[parent];
-    event_queue_index_t left_child  = parent << 1;
-    event_queue_index_t right_child = left_child + 1;
 
-    // if both children are larger than this one, it should not be sifted down anymore
-    if(event_queue[left_child]->event_time > elem->event_time &&
-       event_queue[right_child]->event_time > elem->event_time) {
-      return;
-    }
+    peng_time_t then           = event_queue[i]->event_time;
+    event_queue_index_t parent = i;
 
-    // if the left child is smaller than the right one it should be sifted
-    if(event_queue[left_child]->event_time < event_queue[right_child]->event_time) {
-      event_queue[parent] = event_queue[left_child];
-      event_queue[left_child] = elem;
-      parent = left_child;
-    // otherwise the right child is smaller and should be sifted instead
-    } else {
-      event_queue[parent] = event_queue[right_child];
-      event_queue[right_child] = elem;
-      parent = right_child;
+    for (;;) {
+      event_queue_index_t child = parent << 1; // Left child
+      // if the child is 'outside' of the event queue we can not sift down more
+      if ( child > event_queue_len) {
+          break;
+      }
+      // if the right child is earlier than the right one, we want to sift with the right now
+      if ( child + 1 <= event_queue_len && event_queue[child+1]->event_time < event_queue[child]->event_time ) {
+	        child++;
+      }
+      // if then is already earlier than the child we don't want to sift
+      if (then < event_queue[child]->event_time) {
+          break;
+      }
+      // otherwise the element we are looking at should be sifted down one step
+      sv_t *elem          = event_queue[parent];
+      event_queue[parent] = event_queue[child];
+      event_queue[child]  = elem;
+      parent              = child;
     }
-  }
 }
 
 // sift the element at index i up to its right place
@@ -249,7 +250,7 @@ void tick()
 #endif
 
   while ( event_queue_len > 0 && event_queue[1]->event_time == now ) {
-    sv_t *var = event_queue[1];
+    sv_t *var = dequeue_minimum();
     
     (*var->update)(var);     // Update the value
 #ifdef DEBUG
@@ -270,20 +271,7 @@ void tick()
 
     // Remove the earliest event from the queue
     var->event_time = NO_EVENT_SCHEDULED;
-    sv_t *to_insert = event_queue[event_queue_len--];
-    peng_time_t then = to_insert->event_time;
 
-    event_queue_index_t parent = 1;
-    for (;;) {
-      event_queue_index_t child = parent << 1; // Left child
-      if ( child > event_queue_len) break;
-      if ( child + 1 <= event_queue_len && event_queue[child+1]->event_time < event_queue[child]->event_time )
-	        child++; // Right child is earlier
-      if (then < event_queue[child]->event_time) break; // to_insert is earlier
-      event_queue[parent] = event_queue[child];
-      parent = child;
-    }
-    event_queue[parent] = to_insert;
   }
 
   // Until the queue is empty, take the lowest-numbered continuation from
