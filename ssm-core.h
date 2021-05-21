@@ -43,9 +43,6 @@ typedef uint8_t depth_t;
  */
 extern ssm_time_t now;
 
-/** Member selector for aggregate data types. */
-typedef uint16_t sel_t;
-
 /*** Forward struct declarations ***/
 
 struct sv;      /* Defined in ssm-sv.h */

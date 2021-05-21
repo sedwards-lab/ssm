@@ -87,7 +87,7 @@ static void *get_event(void *queue, idx_t idx) {
 }
 
 static void set_event(void *queue, idx_t idx, void *val) {
-  sel_t **q = (sel_t **)queue, **v = (sel_t **)val;
+  struct sv **q = (struct sv **)queue, **v = (struct sv **)val;
   q[idx] = *v;
 }
 
@@ -144,7 +144,7 @@ static void *get_act(void *queue, idx_t idx) {
 }
 
 static void set_act(void *queue, idx_t idx, void *val) {
-  sel_t **q = (sel_t **)queue, **v = (sel_t **)val;
+  struct act **q = (struct act **)queue, **v = (struct act **)val;
   q[idx] = *v;
 }
 
@@ -157,7 +157,7 @@ void enqueue_act(struct act **act_queue, size_t *queue_len,
 void dequeue_act(struct act **act_queue, size_t *queue_len, idx_t to_dequeue) {
   /*
    * We don't need to create a separate copy of the tail of the queue because
-   * we decrement the queue_size before we call fill_hole, leaving tail beyond
+   * we decrement the queue_size before we call fill_hole, leaving tail beyon
    * the queue.
    */
   struct act **to_insert = &act_queue[QUEUE_HEAD + --*queue_len];
@@ -180,62 +180,5 @@ idx_t index_of_act(struct act **act_queue, size_t *queue_len,
 }
 
 /*** Act queue }}} */
-
-/*** Inner queue (sel_t) {{{ */
-
-static int compar_inner(void *lp, void *rp, void *ctx) {
-  ssm_time_t *inner_time = ctx;
-  sel_t l = *(sel_t *)lp, r = *(sel_t *)rp;
-
-  if (inner_time[l] < inner_time[r])
-    return -1;
-  else if (inner_time[l] == inner_time[r])
-    return 0;
-  else
-    return 1;
-}
-
-static void *get_inner(void *queue, idx_t idx) {
-  sel_t *q = (sel_t *)queue;
-  return &q[idx];
-}
-
-static void set_inner(void *queue, idx_t idx, void *val) {
-  sel_t *q = (sel_t *)queue, *v = (sel_t *)val;
-  q[idx] = *v;
-}
-
-void enqueue_inner(ssm_time_t *inner_time, sel_t *inner_queue,
-                   sel_t to_insert) {
-  enqueue(compar_inner, inner_time, get_inner, set_inner, inner_queue,
-          ++inner_queue[QUEUE_LEN], &to_insert);
-}
-
-void dequeue_inner(ssm_time_t *inner_time, sel_t *inner_queue, idx_t to_dequeue) {
-  /*
-   * We don't need to create a separate copy of the tail of the queue because
-   * we decrement the queue_size before we call fill_hole, leaving tail beyond
-   * the queue.
-   */
-  sel_t *to_insert = &inner_queue[QUEUE_HEAD + --inner_queue[QUEUE_LEN]];
-  fill_hole(compar_inner, inner_time, get_inner, set_inner, inner_queue,
-            inner_queue[QUEUE_LEN], to_dequeue, to_insert);
-}
-
-void requeue_inner(ssm_time_t *inner_time, sel_t *inner_queue,
-                   idx_t to_requeue) {
-  sel_t to_insert = inner_queue[to_requeue];
-  fill_hole(compar_inner, inner_time, get_inner, set_inner, inner_queue,
-            inner_queue[QUEUE_LEN], to_requeue, &to_insert);
-}
-
-idx_t index_of_inner(sel_t *inner_queue, sel_t to_find) {
-  for (idx_t idx = QUEUE_HEAD; idx < inner_queue[QUEUE_LEN]; idx++)
-    if (inner_queue[idx] == to_find)
-      return idx;
-  return 0;
-}
-
-/*** Inner queue }}} */
 
 /* vim: set ts=2 sw=2 tw=80 et foldmethod=marker :*/

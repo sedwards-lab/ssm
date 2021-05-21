@@ -36,7 +36,6 @@ struct trigger {
   struct trigger *next;      /** Next sensitive trigger, if any */
   struct trigger **prev_ptr; /** Pointer to ourself in previous list element */
   struct act *act;           /** Routine triggered by this channel variable */
-  sel_t selector, span;      /* FIXME */
 };
 
 /**

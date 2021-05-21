@@ -51,16 +51,11 @@ static struct act *unschedule_act(idx_t idx) {
 /**
  * Enqueue all the sensitive continuations of a scheduled variable.
  */
-static void schedule_sensitive_triggers(struct sv *sv, priority_t priority,
-                                        sel_t selector) {
+static void schedule_sensitive_triggers(struct sv *sv, priority_t priority) {
   for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
-    if (trigger->act->priority > priority) {
-      /* TODO: check predicate */
-      /* && trigger->start <= selector && selector < trigger->span) */
-      /* if (!trigger->predicate || trigger->predicate(cvt)) */
+    if (trigger->act->priority > priority) 
       if (!trigger->act->scheduled)
         schedule_act(trigger->act);
-    }
 }
 
 /**
@@ -71,8 +66,6 @@ static void schedule_sensitive_triggers(struct sv *sv, priority_t priority,
 static void update_event(struct sv *sv) {
   assert(sv->later_time == now);
 
-  sel_t selector = 0;
-
 #ifdef DEBUG
   printf("update event: %s\n", sv->var_name);
 #endif
@@ -81,16 +74,13 @@ static void update_event(struct sv *sv) {
 #ifdef DEBUG
     printf("calling update: %s\n", sv->vtable->type_name),
 #endif
-      selector = sv->vtable->update(sv);
+      sv->vtable->update(sv);
 
-  if (!(sv->vtable && sv->vtable->sel_max > SELECTOR_ROOT)) {
-    /* Atomic or unit type; update its last_updated and later_time fields */
-    sv->later_time = NO_EVENT_SCHEDULED;
-    sv->u.last_updated = sv->later_time;
-  }
+  sv->later_time = NO_EVENT_SCHEDULED;
+  sv->last_updated = sv->later_time;
 
-  /* FIXME: don't use dummy values for priority and selector params */
-  schedule_sensitive_triggers(sv, 0, selector);
+  /* FIXME: don't use dummy values for priority */
+  schedule_sensitive_triggers(sv, 0);
 }
 
 /*** Internal helpers }}} ***/
@@ -98,16 +88,11 @@ static void update_event(struct sv *sv) {
 /*** Events API, exposed via ssm-event.h {{{ ***/
 
 void initialize_event(struct sv *sv, const struct svtable *vtable) {
+  sv->vtable = vtable;
   sv->triggers = NULL;
-  sv->u.last_updated = now;
+  sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
   sv->var_name = "(no var name)";
-
-  /*
-   * For non-unit types, the caller should set sv->vtable to something else
-   * after calling this function.
-   */
-  sv->vtable = vtable;
 }
 
 void assign_event(struct sv *sv, priority_t prio) {
@@ -124,21 +109,8 @@ void assign_event(struct sv *sv, priority_t prio) {
     dequeue_event(event_queue, &event_queue_len, idx);
   }
 
-  if (sv->vtable && sv->vtable->sel_max > SELECTOR_ROOT) {
-    /* Aggregate type; the caller is expected to set sv->u.later_selector to
-     * that of the current assign event, so that we can use it to schedule
-     * sensitive triggers.
-     */
-    schedule_sensitive_triggers(sv, prio, sv->u.later_selector);
-    /* If there are subsequent non-conflicting updates that should remain
-     * scheduled, sv->later_time and sv->u.later_selector should be restored by
-     * the caller after this function returns.
-     */
-
-  } else {
-    sv->u.last_updated = now;
-    schedule_sensitive_triggers(sv, prio, 0);
-  }
+  sv->last_updated = now;
+  schedule_sensitive_triggers(sv, prio);
 }
 
 void later_event(struct sv *sv, ssm_time_t then) {
@@ -158,13 +130,8 @@ void later_event(struct sv *sv, ssm_time_t then) {
   }
 }
 
-ssm_time_t last_updated_event(struct sv *sv, sel_t selector) {
-  if (sv->vtable && sv->vtable->sel_max > SELECTOR_ROOT) {
-    /* FIXME: implement this for aggregate types */
-    assert(0);
-  }
-
-  return sv->u.last_updated;
+ssm_time_t last_updated_event(struct sv *sv) {
+  return sv->last_updated;
 }
 
 /*** Events API }}} ***/

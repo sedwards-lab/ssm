@@ -11,18 +11,13 @@
 
 #include "ssm-core.h"
 
-/**
- * Represents the whole value for aggregate data types, and the only selector
- * value for atomic and unit types.
- */
-#define SELECTOR_ROOT 0
 
 typedef unsigned long offset_t;
-/** Information about each selector. */
-struct sel_info {
-  offset_t offset;       /* Bytes from sv to payload at selector */
-  offset_t later_offset; /* Bytes from sv to buffered payload at selector */
-  sel_t span;            /* Number of children for selector */
+
+/** Information about each sv payload. */
+struct payload_info {
+  offset_t offset;       /* Bytes from sv to payload */
+  offset_t later_offset; /* Bytes from sv to buffered payload */
 };
 
 /**
@@ -34,66 +29,42 @@ typedef uint64_t any_t;
 /** The virtual table for each scheduled variable type. */
 struct svtable {
   /**
-   * The maximum selector value for the type. sel_max should be 0 if and only if
-   * the scheduled variable type is atomic (its inner components cannot be
-   * scheduled separately).
-   */
-  sel_t sel_max;
-
-  /**
    * Callback to update a channel variable. Called in tick().
    *
    * Reponsible for:
-   * - Updating value (if there is one), according to later_value and selector.
-   * - Aggregate types: setting inner last_updated times to now, according to
-   *   selector.
-   * - Setting event_time to when the channel variable should be next scheduled,
+   * - Updating value (if there is one), according to later_value.
+   * - Setting later_time to when the channel variable should be next scheduled,
    *   or NO_EVENT_SCHEDULED if it shouldn't.
-   * - Setting selector and later_value if sv should be rescheduled.
+   * - Setting later_value if sv should be rescheduled.
    *
    * Not responsible for:
    * - Atomic types: setting last_updated time to now; this will be done by
    *   the caller, in tick().
-   * - Resetting selector or later_value if sv isn't being rescheduled; these
-   *   will get overwritten later anyway.
    */
-  sel_t (*update)(struct sv *);
+  void (*update)(struct sv *);
 
   /**
    * Assign to the unit type in the current instant, and schedule all sensitive
    * processes to run. Called by user-defined routine.
    *
    * Responsible for:
-   * - Updating value (if there is one) to the given value, and according to the
-   *   given selector.
-   * - Aggregate types: resolving any inner update conflicts. This means
-   *   internally unscheduling any conflicting updates. If the globally queued
-   *   update (exposed by later_time and later_selector) is conflicting, leave
-   *   later_time set, so that assign_event will unschedule it. Otherwise, set
-   *   later_time to NO_EVENT_SCHEDULED, to leave event in the queue. Set
-   *   later_selector to the given selector.
+   * - Updating value (if there is one) to the given value.
    * - Calling assign_event, which will unschedule the event if later_time is
    *   not NO_EVENT_SCHEDULED, set last_updated to now for atomic types, and
    *   schedule sensitive triggers.
-   * - Aggregate types: restore later_time and later_selector for subsequent,
-   *   non-conflicting updates.
    *
    * Not responsible for:
    * - Atomic types: unsetting later_time; this is done by assign_event, which
    *   will also unschedule the event from the event queue.
    */
-  void (*assign)(struct sv *, priority_t, const any_t, sel_t);
+  void (*assign)(struct sv *, priority_t, const any_t);
 
   /**
    * Schedule a delayed assignment at the given time. Called by user-defined
    * routine.
    *
    * Responsible for:
-   * - Setting later_value to the given value, according to the given selector.
-   * - Aggregate types: adding update to inner queue, and resolving any inner
-   *   update conflicts. If the globally queued update is conflicting, or later
-   *   than the given time, leave later_time as is so the event can be
-   *   rescheduled, and set later_selector according to the given selector.
+   * - Setting later_value to the given value.
    * - Calling later_event if the event needs to be rescheduled, which will set
    *   later_time to the given time and add or reschedule the event in the event
    *   queue. Note that this does not need to be done if the scheduled event is
@@ -104,16 +75,16 @@ struct svtable {
    *   is done by later_event, which will also unschedule/reschedule the event
    *   from the event queue.
    */
-  void (*later)(struct sv *, ssm_time_t, const any_t, sel_t);
+  void (*later)(struct sv *, ssm_time_t, const any_t);
 
   /**
-   * Points to table of size sel_max, containing information about each member.
+   * Points to information about each member.
    *
    * TODO: this table can be inlined into the vtable to reduce one level of
    * indirection, but that involves some pointer casting I don't want to do just
    * yet.
    */
-  const struct sel_info *sel_info;
+  const struct payload_info *payload_info;
 
   const char *type_name;
 };
@@ -133,10 +104,7 @@ struct sv {
   const struct svtable *vtable; /* Pointer to the virtual table */
   struct trigger *triggers;     /* List of sensitive continuations */
   ssm_time_t later_time;        /* When the variable should be next updated */
-  union {
-    ssm_time_t last_updated; /* When vtable->sel_max == 0 */
-    sel_t later_selector;    /* Otherwise */
-  } u;
+  ssm_time_t last_updated;      /* When the variable was last updated */
   const char *var_name;
 };
 
@@ -147,6 +115,6 @@ struct sv {
 extern void initialize_event(struct sv *, const struct svtable *);
 extern void assign_event(struct sv *, priority_t);
 extern void later_event(struct sv *, ssm_time_t);
-extern ssm_time_t last_updated_event(struct sv *, sel_t selector);
+extern ssm_time_t last_updated_event(struct sv *);
 
 #endif /* _SSM_SV_H */

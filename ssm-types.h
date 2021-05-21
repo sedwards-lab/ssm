@@ -15,21 +15,20 @@
  */
 struct svt_ptr {
   struct sv *ptr;
-  sel_t selector;
 };
 
 #define PTR_ASSIGN(ptr_sv, prio, val)                                          \
-  (ptr_sv).ptr->vtable->assign((ptr_sv).ptr, prio, val, (ptr_sv).selector)
+  (ptr_sv).ptr->vtable->assign((ptr_sv).ptr, prio, val)
 
 #define PTR_LATER(ptr_sv, then, val)                                           \
-  (ptr_sv).ptr->vtable->later((ptr_sv).ptr, then, val, (ptr_sv).selector)
+  (ptr_sv).ptr->vtable->later((ptr_sv).ptr, then, val)
 
 #define PTR_OF_SV(sv)                                                          \
-  (struct svt_ptr) { .ptr = &(sv), .selector = 0 }
+  (struct svt_ptr) { .ptr = &(sv) }
 
 #define DEREF(type, ptr_sv)                                                    \
   (type *)(((char *)(ptr_sv).ptr) +                                            \
-           (ptr_sv).ptr->vtable->sel_info[(ptr_sv).selector].offset)
+           (ptr_sv).ptr->vtable->payload_info[0].offset)
 
 /*** Unit type {{{
  *
@@ -62,28 +61,6 @@ extern const struct svtable *unit_vtable;
   extern const struct svtable payload_t##_vtable;                              \
   typedef struct svt_ptr ptr_##payload_t##_svt
 
-/**
- * Declare an aggregate scheduled variable type for payload type payload_t,
- * whose max selector value is sel_max.
- *
- * The payload_param is used to indicate what the initialization function
- * parameter type should be. If the top-level type of payload_t is a struct,
- * payload_param be payload_t *. If the top-level type of payload_t is an array
- * of T (e.g., [3]int), then payload_param should just be T * (e.g., int *),
- * to conform with C's parameter-passing conventions.
- */
-#define DECLARE_SCHED_VARIABLE_AGGREGATE(payload_t, payload_param, sel_max)    \
-  typedef struct {                                                             \
-    struct sv sv;                                                              \
-    payload_t value;                    /* Current value */                    \
-    payload_t later_value;              /* Buffered value */                   \
-    ssm_time_t inner_time[sel_max + 1]; /* event_time per selector */          \
-    ssm_time_t last_updated[sel_max + 1];                                      \
-    sel_t inner_queue[sel_max + 1 + QUEUE_HEAD];                               \
-  } payload_t##_svt;                                                           \
-  extern const struct svtable payload_t##_vtable;                              \
-  typedef struct svt_ptr ptr_##payload_t##_svt
-
 /* Declaration helpers }}} */
 
 /*** Scalar types {{{ */
@@ -108,17 +85,6 @@ DECLARE_SCHED_VARIABLE_SCALAR(u32);
 DECLARE_SCHED_VARIABLE_SCALAR(u64);
 
 /* Scalar types }}} */
-
-/*** Aggregate types {{{ */
-
-/* TODO: write these xD */
-
-typedef struct {
-  i32 left;
-  i32 right;
-} tup2_i32;
-
-/* Aggregate types }}} */
 
 #endif /* _SSM_TYPES_H */
 
