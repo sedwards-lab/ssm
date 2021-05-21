@@ -87,7 +87,7 @@ static void *get_event(void *queue, idx_t idx) {
 }
 
 static void set_event(void *queue, idx_t idx, void *val) {
-  sel_t **q = (sel_t **)queue, **v = (sel_t **)val;
+  struct sv **q = (struct sv **)queue, **v = (struct sv **)val;
   q[idx] = *v;
 }
 
@@ -100,7 +100,7 @@ void enqueue_event(struct sv **event_queue, size_t *queue_len,
 void dequeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_dequeue) {
   /*
    * We don't need to create a separate copy of the tail of the queue because
-   * we decrement the queue_size before we call fill_hole, leaving tail beyond
+   * we decrement the queue_size before we call fill_hole, leaving tail beyo
    * the queue.
    */
   struct sv **to_insert = &event_queue[QUEUE_HEAD + --*queue_len];
@@ -144,7 +144,7 @@ static void *get_act(void *queue, idx_t idx) {
 }
 
 static void set_act(void *queue, idx_t idx, void *val) {
-  sel_t **q = (sel_t **)queue, **v = (sel_t **)val;
+  struct act **q = (struct act **)queue, **v = (struct act **)val;
   q[idx] = *v;
 }
 
