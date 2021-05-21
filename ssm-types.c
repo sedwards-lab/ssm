@@ -6,11 +6,7 @@
 #include "ssm-types.h"
 #include "ssm-queue.h" /* For managing inner queues */
 
-/**
- * Unit type "implementation", which uses underlying the pure event
- * implementation and nothing more.
- */
-void (*const initialize_unit)(unit_svt *) = &initialize_event;
+const struct svtable *unit_vtable = NULL;
 
 /**
  * Scalar definition helper macro
@@ -33,33 +29,28 @@ void (*const initialize_unit)(unit_svt *) = &initialize_event;
     v->later_value = (payload_t)value;                                         \
     later_event(sv, then);                                                     \
   }                                                                            \
-  static const struct sel_info sel_info_##payload_t[1] = {                     \
+  static const struct sel_info payload_t##_sel_info[1] = {                     \
       {.offset = offsetof(payload_t##_svt, value),                             \
        .later_offset = offsetof(payload_t##_svt, later_value),                 \
        .span = 1}};                                                            \
-  static const struct svtable vtable_##payload_t = {                           \
+  const struct svtable payload_t##_vtable = {                                  \
       .sel_max = 0,                                                            \
       .update = update_##payload_t,                                            \
       .assign = assign_##payload_t,                                            \
       .later = later_##payload_t,                                              \
-      .sel_info = sel_info_##payload_t,                                        \
+      .sel_info = payload_t##_sel_info,                                        \
       .type_name = #payload_t,                                                 \
-  };                                                                           \
-  void initialize_##payload_t(payload_t##_svt *v, payload_t init_value) {      \
-    initialize_event(&v->sv);                                                  \
-    v->value = init_value;                                                     \
-    v->sv.vtable = &vtable_##payload_t;                                        \
   }
 
 /**
  * Define implementation for scalar types
  */
-DEFINE_SCHED_VARIABLE_SCALAR(bool)
-DEFINE_SCHED_VARIABLE_SCALAR(i8)
-DEFINE_SCHED_VARIABLE_SCALAR(i16)
-DEFINE_SCHED_VARIABLE_SCALAR(i32)
-DEFINE_SCHED_VARIABLE_SCALAR(i64)
-DEFINE_SCHED_VARIABLE_SCALAR(u8)
-DEFINE_SCHED_VARIABLE_SCALAR(u16)
-DEFINE_SCHED_VARIABLE_SCALAR(u32)
-DEFINE_SCHED_VARIABLE_SCALAR(u64)
+DEFINE_SCHED_VARIABLE_SCALAR(bool);
+DEFINE_SCHED_VARIABLE_SCALAR(i8);
+DEFINE_SCHED_VARIABLE_SCALAR(i16);
+DEFINE_SCHED_VARIABLE_SCALAR(i32);
+DEFINE_SCHED_VARIABLE_SCALAR(i64);
+DEFINE_SCHED_VARIABLE_SCALAR(u8);
+DEFINE_SCHED_VARIABLE_SCALAR(u16);
+DEFINE_SCHED_VARIABLE_SCALAR(u32);
+DEFINE_SCHED_VARIABLE_SCALAR(u64);

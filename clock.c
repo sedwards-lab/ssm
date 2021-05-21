@@ -54,7 +54,7 @@ struct act *enter_second_clock(struct act *parent, priority_t priority,
                               parent, priority, depth);
   act_second_clock_t *a = container_of(act, act_second_clock_t, act);
   a->second_event = second_event;
-  initialize_unit(&a->timer);
+  initialize_event(&a->timer, unit_vtable);
 
   return act;
 }
@@ -97,7 +97,7 @@ struct act *enter_report_seconds(struct act *parent, priority_t priority,
                               parent, priority, depth);
   act_report_seconds_t *a = container_of(act, act_report_seconds_t, act);
   a->second_event = second_event;
-  initialize_i32(&a->seconds, 0);
+  initialize_event(&a->seconds.sv, &i32_vtable);
 
   return act;
 }
@@ -107,6 +107,8 @@ void step_report_seconds(struct act *act) {
 
   switch (act->pc) {
   case 0:
+    a->seconds.value = 0;
+
     for (;;) { /* loop */
       a->trigger1.act = act;
       a->trigger1.selector = 0;
@@ -140,7 +142,7 @@ struct act *enter_main(struct act *parent, priority_t priority, depth_t depth) {
   act_main_t *a = container_of(act, act_main_t, act);
 
   /* Initialize managed variables */
-  initialize_event(&a->second);
+  initialize_event(&a->second, unit_vtable);
   return act;
 }
 

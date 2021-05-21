@@ -20,7 +20,7 @@ fib n &r
 typedef struct {
   struct act act;
 
-  i32_svt n;
+  i32 n;
   ptr_i32_svt r;
   i32_svt r2;
 } fib_act_t;
@@ -28,38 +28,42 @@ typedef struct {
 stepf_t step_fib;
 
 struct act *enter_fib(struct act *cont, priority_t priority, depth_t depth,
-                      int n, ptr_i32_svt r) {
-  struct act *a = act_enter(sizeof(fib_act_t), step_fib, cont, priority, depth);
-  fib_act_t *act = container_of(a, fib_act_t, act);
-  initialize_i32(&act->n, n);
-  act->r = r;
-  initialize_i32(&act->r2, 0);
+                      i32 n, ptr_i32_svt r) {
 
-  return a;
+  struct act *act =
+      act_enter(sizeof(fib_act_t), step_fib, cont, priority, depth);
+  fib_act_t *a = container_of(act, fib_act_t, act);
+  a->n = n;
+  a->r = r;
+  initialize_event(&a->r2.sv, &i32_vtable);
+
+  return act;
 }
 
-void step_fib(struct act *a) {
-  fib_act_t *act = container_of(a, fib_act_t, act);
-  switch (a->pc) {
+void step_fib(struct act *act) {
+  fib_act_t *a = container_of(act, fib_act_t, act);
+  switch (act->pc) {
   case 0: {
-    if (act->n.value < 2) {
-      PTR_ASSIGN(act->r, a->priority, 1);
-      act_leave(a, sizeof(fib_act_t));
+    a->r2.value = 0; /* initialize value */
+
+    if (a->n < 2) {
+      PTR_ASSIGN(a->r, act->priority, 1);
+      act_leave(act, sizeof(fib_act_t));
       return;
     }
-    depth_t new_depth = a->depth - 1; /* 2 children */
-    priority_t new_priority = a->priority;
+    depth_t new_depth = act->depth - 1; /* 2 children */
+    priority_t new_priority = act->priority;
     priority_t pinc = 1 << new_depth;
-    act_fork(enter_fib(a, new_priority, new_depth, act->n.value - 1, act->r));
+    act_fork(enter_fib(act, new_priority, new_depth, a->n - 1, a->r));
     new_priority += pinc;
-    act_fork(enter_fib(a, new_priority, new_depth, act->n.value - 2,
-                       PTR_OF_SV(act->r2.sv)));
-    a->pc = 1;
+    act_fork(
+        enter_fib(act, new_priority, new_depth, a->n - 2, PTR_OF_SV(a->r2.sv)));
+    act->pc = 1;
     return;
   }
   case 1:
-    PTR_ASSIGN(act->r, a->priority, *DEREF(int, act->r) + act->r2.value);
-    act_leave(a, sizeof(fib_act_t));
+    PTR_ASSIGN(a->r, act->priority, *DEREF(int, a->r) + a->r2.value);
+    act_leave(act, sizeof(fib_act_t));
     return;
   }
   assert(0);
@@ -68,13 +72,15 @@ void step_fib(struct act *a) {
 void top_return(struct act *cont) { return; }
 
 int main(int argc, char *argv[]) {
-  i32_svt result;
-  initialize_i32(&result, 0);
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
+  i32_svt result;
+  initialize_event(&result.sv, &i32_vtable);
+  result.value = 0;
+
   struct act top = {.step = top_return};
-  act_fork(
-      enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n, PTR_OF_SV(result.sv)));
+  act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
+                     PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
   tick();

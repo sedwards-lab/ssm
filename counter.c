@@ -278,12 +278,11 @@ struct act *enter_main(struct act *parent, priority_t priority, depth_t depth) {
       act_enter(sizeof(act_main_t), step_main, parent, priority, depth);
   act_main_t *a = container_of(act, act_main_t, act);
 
-  /* Initialize managed variables */
-  initialize_i32(&a->clk, 0);
-  initialize_i32(&a->d1, 0);
-  initialize_i32(&a->q1, 0);
-  initialize_i32(&a->d2, 0);
-  initialize_i32(&a->q2, 0);
+  initialize_event(&a->clk.sv, &i32_vtable);
+  initialize_event(&a->d1.sv, &i32_vtable);
+  initialize_event(&a->q1.sv, &i32_vtable);
+  initialize_event(&a->d2.sv, &i32_vtable);
+  initialize_event(&a->q2.sv, &i32_vtable);
   return act;
 }
 
@@ -294,6 +293,12 @@ void step_main(struct act *act) {
 
   switch (act->pc) {
   case 0:
+    a->clk.value = 0;
+    a->d1.value = 0;
+    a->d2.value = 0;
+    a->q1.value = 0;
+    a->q2.value = 0;
+
     new_depth = act->depth - 3; // Make space for 8 children
     pinc = 1 << new_depth;      // priority increment for each thread
     act_fork(enter_clk(act, act->priority + 0 * pinc, new_depth, a));

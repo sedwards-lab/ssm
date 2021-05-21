@@ -40,8 +40,7 @@ struct svt_ptr {
  */
 typedef struct sv unit_svt;
 typedef struct svt_ptr ptr_unit_svt;
-
-extern void (*const initialize_unit)(unit_svt *);
+extern const struct svtable *unit_vtable;
 
 /* Unit type }}} */
 
@@ -60,7 +59,7 @@ extern void (*const initialize_unit)(unit_svt *);
     payload_t value;       /* Current value */                                 \
     payload_t later_value; /* Buffered value */                                \
   } payload_t##_svt;                                                           \
-  extern void initialize_##payload_t(payload_t##_svt *, payload_t);            \
+  extern const struct svtable payload_t##_vtable;                              \
   typedef struct svt_ptr ptr_##payload_t##_svt
 
 /**
@@ -82,7 +81,7 @@ extern void (*const initialize_unit)(unit_svt *);
     ssm_time_t last_updated[sel_max + 1];                                      \
     sel_t inner_queue[sel_max + 1 + QUEUE_HEAD];                               \
   } payload_t##_svt;                                                           \
-  extern void initialize_##payload_t(payload_t##_svt *, const payload_param);  \
+  extern const struct svtable payload_t##_vtable;                              \
   typedef struct svt_ptr ptr_##payload_t##_svt
 
 /* Declaration helpers }}} */

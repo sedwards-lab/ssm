@@ -51,9 +51,6 @@ struct act *enter_mywait(struct act *cont, priority_t priority, depth_t depth,
   struct act *act =
       act_enter(sizeof(act_mywait_t), step_mywait, cont, priority, depth);
   act_mywait_t *a = container_of(act, act_mywait_t, act);
-
-  a->trigger1.act = act;
-  /* rar->trigger1.predicate = NULL; */
   a->r = r;
   return act;
 }
@@ -63,6 +60,7 @@ void step_mywait(struct act *act) {
 
   switch (act->pc) {
   case 0:
+    a->trigger1.act = act;
     a->trigger1.selector = a->r.selector;
     a->trigger1.span = a->r.ptr->vtable->sel_info[a->r.selector].span;
     sensitize(a->r.ptr, &a->trigger1);
@@ -118,8 +116,8 @@ struct act *enter_fib(struct act *cont, priority_t priority, depth_t depth,
   act_fib_t *a = container_of(act, act_fib_t, act);
   a->n = n;
   a->r = r;
-  initialize_i32(&a->r1, 0);
-  initialize_i32(&a->r2, 0);
+  initialize_event(&a->r1.sv, &i32_vtable);
+  initialize_event(&a->r2.sv, &i32_vtable);
   return act;
 }
 
@@ -127,6 +125,8 @@ void step_fib(struct act *act) {
   act_fib_t *a = container_of(act, act_fib_t, act);
   switch (act->pc) {
   case 0: {
+    a->r1.value = 0;
+    a->r2.value = 0;
     if (a->n < 2) {
       PTR_LATER(a->r, now + 1, 1);
       act_leave(act, sizeof(act_fib_t));
@@ -157,12 +157,13 @@ void top_return(struct act *cont) { return; }
 
 int main(int argc, char *argv[]) {
   i32_svt result;
-  initialize_i32(&result, 0);
+  initialize_event(&result.sv, &i32_vtable);
+  result.value = 0;
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
   struct act top = {.step = top_return};
-  act_fork(
-      enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n, PTR_OF_SV(result.sv)));
+  act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
+                     PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())

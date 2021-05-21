@@ -40,8 +40,8 @@ struct act *enter_fib(struct act *cont, priority_t priority, depth_t depth,
   fib_act_t *act = container_of(a, fib_act_t, act);
   act->n = n;
   act->result = result;
-  initialize_i32(&act->tmp2, 0);
-  initialize_i32(&act->tmp3, 0);
+  initialize_event(&act->tmp2.sv, &i32_vtable);
+  initialize_event(&act->tmp3.sv, &i32_vtable);
   return a;
 }
 
@@ -84,7 +84,7 @@ void top_return(struct act *cont) { return; }
 
 int main(int argc, char *argv[]) {
   i32_svt result;
-  initialize_i32(&result, 0);
+  initialize_event(&result.sv, &i32_vtable);
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
   /*

@@ -97,7 +97,7 @@ static void update_event(struct sv *sv) {
 
 /*** Events API, exposed via ssm-event.h {{{ ***/
 
-void initialize_event(struct sv *sv) {
+void initialize_event(struct sv *sv, const struct svtable *vtable) {
   sv->triggers = NULL;
   sv->u.last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
@@ -107,7 +107,7 @@ void initialize_event(struct sv *sv) {
    * For non-unit types, the caller should set sv->vtable to something else
    * after calling this function.
    */
-  sv->vtable = NULL;
+  sv->vtable = vtable;
 }
 
 void assign_event(struct sv *sv, priority_t prio) {

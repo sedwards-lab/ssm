@@ -115,7 +115,7 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
   struct act *act =
       act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
   act_main_t *a = container_of(act, act_main_t, act);
-  initialize_i32(&a->a, 0);
+  initialize_event(&a->a.sv, &i32_vtable);
   a->a.sv.var_name = "a";
 
 #ifdef DEBUG
@@ -129,6 +129,7 @@ void step_main(struct act *act) {
   act_main_t *a = container_of(act, act_main_t, act);
   switch (act->pc) {
   case 0: {
+    /* We could initialize a->a here, but no need */
     a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10, 0);
 
     depth_t new_depth = act->depth - 1; /* 2 children */

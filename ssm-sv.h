@@ -144,7 +144,7 @@ struct sv {
  * Scheduling interface for scheduled variables. Defined in ssm-sched.c, and
  * used by type-specific implementations.
  */
-extern void initialize_event(struct sv *);
+extern void initialize_event(struct sv *, const struct svtable *);
 extern void assign_event(struct sv *, priority_t);
 extern void later_event(struct sv *, ssm_time_t);
 extern ssm_time_t last_updated_event(struct sv *, sel_t selector);
