@@ -38,11 +38,11 @@ ssm_time_t now; /* FIXME: Should we initialize? */
 static void schedule_sensitive_triggers(struct sv *sv, priority_t priority,
                                         sel_t selector) {
   for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
-    if (trigger->rar->priority > priority) {
+    if (trigger->act->priority > priority) {
       /* TODO: check predicate */
       /* && trigger->start <= selector && selector < trigger->span) */
       /* if (!trigger->predicate || trigger->predicate(cvt)) */
-      enqueue_act(act_queue, &act_queue_len, trigger->rar);
+      enqueue_act(act_queue, &act_queue_len, trigger->act);
     }
 }
 
@@ -181,7 +181,8 @@ void initialize_ssm(ssm_time_t start) {
 }
 
 ssm_time_t tick() {
-  /* For each queued event scheduled for the current time, remove the event from
+  /*
+   * For each queued event scheduled for the current time, remove the event from
    * the queue, update its variable, and schedule everything sensitive to it.
    */
   while (event_queue_len > 0 && event_queue[QUEUE_HEAD]->later_time == now) {
@@ -196,7 +197,8 @@ ssm_time_t tick() {
       requeue_event(event_queue, &event_queue_len, QUEUE_HEAD);
   }
 
-  /* Until the queue is empty, take the lowest-numbered continuation from the
+  /*
+   * Until the queue is empty, take the lowest-numbered continuation from the
    * activation record queue and run it, which might insert additional
    * continuations in the queue.
    *
@@ -209,8 +211,13 @@ ssm_time_t tick() {
     dequeue_act(act_queue, &act_queue_len, QUEUE_HEAD);
     to_run->step(to_run);
   }
-  return event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
+
+  /* FIXME: this interface isn't really usable. We want the runtime driver to be
+   * able to interrupt sooner than now, so that it can respond to I/O etc.
+   */
+  now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
                              : NO_EVENT_SCHEDULED;
+  return now;
 }
 
 /*** Runtime API }}} ***/

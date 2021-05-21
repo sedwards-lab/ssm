@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "ssm.h"
 
-/* 
+#include "ssm-act.h"
+#include "ssm-runtime.h"
+#include "ssm-types.h"
+
+/*
 mywait &r
   wait r
 
@@ -11,7 +14,7 @@ sum &r1 &r2 &r
   after 1s r = r1 + r2
 
 fib n &r
-  var r1 = 0  
+  var r1 = 0
   var r2 = 0
   if n < 2 then after 1s r = 1 else
     fork sum(r1, r2, r)  fib(n-1, r1)  fib(n-2, r2)
@@ -22,157 +25,149 @@ fib n &r
  */
 
 typedef struct {
-	ACTIVATION_RECORD_FIELDS;
-	ptr_int_cvt r;
-	trigger_t trigger1;
-} rar_mywait_t;
+  struct act act;
+
+  ptr_i32_svt r;
+  struct trigger trigger1;
+} act_mywait_t;
 
 typedef struct {
-	ACTIVATION_RECORD_FIELDS;
-	ptr_int_cvt r1, r2, r;
-} rar_sum_t;
+  struct act act;
+  ptr_i32_svt r1, r2, r;
+} act_sum_t;
 
 typedef struct {
-	ACTIVATION_RECORD_FIELDS;
+  struct act act;
 
-	int n;       // Local variable
-	ptr_int_cvt r;      // Where we should write our result
-	int_cvt r1, r2;
-} rar_fib_t;
+  int n;         // Local variable
+  ptr_i32_svt r; // Where we should write our result
+  i32_svt r1, r2;
+} act_fib_t;
 
 stepf_t step_mywait;
 
-rar_mywait_t *enter_mywait(rar_t *cont, priority_t priority,
-		     depth_t depth, ptr_int_cvt r)
-{
-	rar_mywait_t *rar = (rar_mywait_t *) enter(sizeof(rar_mywait_t),
-				step_mywait, cont,
-				priority, depth);
-	rar->trigger1.rar = (rar_t *) rar;
-	/* rar->trigger1.predicate = NULL; */
-	rar->r = r;
-	return rar;
+struct act *enter_mywait(struct act *cont, priority_t priority, depth_t depth,
+                         ptr_i32_svt r) {
+  struct act *act =
+      act_enter(sizeof(act_mywait_t), step_mywait, cont, priority, depth);
+  act_mywait_t *a = container_of(act, act_mywait_t, act);
+
+  a->trigger1.act = act;
+  /* rar->trigger1.predicate = NULL; */
+  a->r = r;
+  return act;
 }
 
-void step_mywait(rar_t *act)  
-{
-	rar_mywait_t *rar = (rar_mywait_t *) act;
-	switch (rar->pc) {
-	case 0:
-		rar->trigger1.start = rar->r.offset;
-		rar->trigger1.span = int_sel_range;
-		sensitize(rar->r.ptr, &rar->trigger1);
-		rar->pc = 1;
-		return;
-	case 1:
-		desensitize(&rar->trigger1);
-		leave((rar_t *) rar, sizeof(rar_mywait_t));
-		return;
-	}
+void step_mywait(struct act *act) {
+  act_mywait_t *a = container_of(act, act_mywait_t, act);
+
+  switch (act->pc) {
+  case 0:
+    a->trigger1.selector = a->r.selector;
+    a->trigger1.span = a->r.ptr->vtable->sel_info[a->r.selector].span;
+    sensitize(a->r.ptr, &a->trigger1);
+    act->pc = 1;
+    return;
+  case 1:
+    desensitize(&a->trigger1);
+    act_leave(act, sizeof(act_mywait_t));
+    return;
+  }
 }
 
 stepf_t step_sum;
 
-rar_sum_t *enter_sum(rar_t *cont, priority_t priority,
-			depth_t depth, ptr_int_cvt r1, ptr_int_cvt r2, ptr_int_cvt r)
-{
-	rar_sum_t *rar = (rar_sum_t *) enter(sizeof(rar_sum_t), step_sum, cont,
-			priority, depth);
-	rar->r1 = r1;
-	rar->r2 = r2;
-	rar->r = r;
-	return rar;
+struct act *enter_sum(struct act *cont, priority_t priority, depth_t depth,
+                      ptr_i32_svt r1, ptr_i32_svt r2, ptr_i32_svt r) {
+
+  struct act *act =
+      act_enter(sizeof(act_sum_t), step_sum, cont, priority, depth);
+  act_sum_t *a = container_of(act, act_sum_t, act);
+  a->r1 = r1;
+  a->r2 = r2;
+  a->r = r;
+  return act;
 }
 
-void step_sum(rar_t *act)  
-{
-	rar_sum_t *rar = (rar_sum_t *) act;
-	switch (rar->pc) {
-	case 0: {
-		depth_t new_depth = rar->depth - 1; // 2 children
-		priority_t new_priority = rar->priority;
-		priority_t pinc = 1 << new_depth;
-		fork((rar_t *) enter_mywait((rar_t *) rar, new_priority, new_depth,
-				rar->r1));
-		new_priority += pinc;
-		fork((rar_t *) enter_mywait( (rar_t *) rar, new_priority, new_depth,
-				rar->r2));
-		rar->pc = 1;
-		return;
-	}
-	case 1:
-		PTR_LATER(rar->r, *DEREF(int, rar->r1) + *DEREF(int, rar->r2), now + 1);
-		leave((rar_t *) rar, sizeof(rar_sum_t));
-		return;
-	}
+void step_sum(struct act *act) {
+  act_sum_t *a = container_of(act, act_sum_t, act);
+  switch (act->pc) {
+  case 0: {
+    depth_t new_depth = act->depth - 1; // 2 children
+    priority_t new_priority = act->priority;
+    priority_t pinc = 1 << new_depth;
+    act_fork(enter_mywait(act, new_priority, new_depth, a->r1));
+    new_priority += pinc;
+    act_fork(enter_mywait(act, new_priority, new_depth, a->r2));
+    act->pc = 1;
+    return;
+  }
+  case 1:
+    PTR_LATER(a->r, now + 1, *DEREF(int, a->r1) + *DEREF(int, a->r2));
+    act_leave(act, sizeof(act_sum_t));
+    return;
+  }
 }
-
 
 stepf_t step_fib;
 
-rar_fib_t *enter_fib(rar_t *cont, priority_t priority, depth_t depth, int n, ptr_int_cvt r)
-{
-	rar_fib_t *rar = (rar_fib_t *) enter(sizeof(rar_fib_t), step_fib, cont,
-				priority, depth);
-	rar->n = n;
-	rar->r = r;
-	initialize_int(&rar->r1, 0);
-	initialize_int(&rar->r2, 0);
-	return rar;
+struct act *enter_fib(struct act *cont, priority_t priority, depth_t depth,
+                      int n, ptr_i32_svt r) {
+  struct act *act =
+      act_enter(sizeof(act_fib_t), step_fib, cont, priority, depth);
+  act_fib_t *a = container_of(act, act_fib_t, act);
+  a->n = n;
+  a->r = r;
+  initialize_i32(&a->r1, 0);
+  initialize_i32(&a->r2, 0);
+  return act;
 }
 
-void step_fib(rar_t *act)
-{
-	rar_fib_t *rar = (rar_fib_t *) act;
-	switch (rar->pc) {
-	case 0: {
-		if (rar->n < 2) {
-			PTR_LATER(rar->r, 1, now + 1);
-			leave((rar_t *) rar, sizeof(rar_fib_t));
-			return;
-		}
-		depth_t new_depth = rar->depth - 2; // 4 children
-		priority_t new_priority = rar->priority;
-		priority_t pinc = 1 << new_depth;
-		fork((rar_t *) enter_fib((rar_t *) rar, new_priority, new_depth,
-				rar->n - 1, ptr_of_int(&rar->r1)));
-		new_priority += pinc;
-		fork((rar_t *) enter_fib((rar_t *) rar, new_priority, new_depth,
-				rar->n - 2, ptr_of_int(&rar->r2)));
-		new_priority += pinc;
-		fork((rar_t *) enter_sum((rar_t *) rar, new_priority, new_depth,
-					ptr_of_int(&rar->r1), ptr_of_int(&rar->r2), rar->r));
+void step_fib(struct act *act) {
+  act_fib_t *a = container_of(act, act_fib_t, act);
+  switch (act->pc) {
+  case 0: {
+    if (a->n < 2) {
+      PTR_LATER(a->r, now + 1, 1);
+      act_leave(act, sizeof(act_fib_t));
+      return;
+    }
+    depth_t new_depth = act->depth - 2; // 4 children
+    priority_t new_priority = act->priority;
+    priority_t pinc = 1 << new_depth;
+    act_fork(
+        enter_fib(act, new_priority, new_depth, a->n - 1, PTR_OF_SV(a->r1.sv)));
+    new_priority += pinc;
+    act_fork(
+        enter_fib(act, new_priority, new_depth, a->n - 2, PTR_OF_SV(a->r2.sv)));
+    new_priority += pinc;
+    act_fork(enter_sum(act, new_priority, new_depth, PTR_OF_SV(a->r1.sv),
+                       PTR_OF_SV(a->r2.sv), a->r));
 
-		rar->pc = 1;
-		return;
-	}
-	case 1:
-		leave((rar_t *) rar, sizeof(rar_fib_t));
-		return;
-	}
+    act->pc = 1;
+    return;
+  }
+  case 1:
+    act_leave(act, sizeof(act_fib_t));
+    return;
+  }
 }
 
-void top_return(rar_t *cont)
-{
-	return;
-}
+void top_return(struct act *cont) { return; }
 
-int main(int argc, char *argv[])
-{
-	int_cvt result;
-	initialize_int(&result, 0);
-	int n = argc > 1 ? atoi(argv[1]) : 3;
+int main(int argc, char *argv[]) {
+  i32_svt result;
+  initialize_i32(&result, 0);
+  int n = argc > 1 ? atoi(argv[1]) : 3;
 
-	rar_t top = { .step = top_return };
-	fork((rar_t *) enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n, ptr_of_int(&result)));
+  struct act top = {.step = top_return};
+  act_fork(
+      enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n, PTR_OF_SV(result.sv)));
 
-	tick();
-	while (event_queue_len > 0) {
-		now = event_queue[1]->event_time;
-		printf("now %lu (%d events pending)\n", now, event_queue_len);
-		tick();
-	}
+  initialize_ssm(0);
+  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
+    printf("now %lu\n", next);
 
-	printf("%d\n", result.value);
-	return 0;
+  printf("%d\n", result.value);
+  return 0;
 }

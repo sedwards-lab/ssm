@@ -22,7 +22,7 @@ typedef unsigned long offset_t;
 struct sel_info {
   offset_t offset;       /* Bytes from sv to payload at selector */
   offset_t later_offset; /* Bytes from sv to buffered payload at selector */
-  sel_t range;           /* Number of children for selector */
+  sel_t span;            /* Number of children for selector */
 };
 
 /**

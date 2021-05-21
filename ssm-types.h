@@ -21,6 +21,9 @@ struct svt_ptr {
 #define PTR_ASSIGN(ptr_sv, prio, val)                                          \
   (ptr_sv).ptr->vtable->assign((ptr_sv).ptr, prio, val, (ptr_sv).selector)
 
+#define PTR_LATER(ptr_sv, then, val)                                           \
+  (ptr_sv).ptr->vtable->later((ptr_sv).ptr, then, val, (ptr_sv).selector)
+
 #define PTR_OF_SV(sv)                                                          \
   (struct svt_ptr) { .ptr = &(sv), .selector = 0 }
 

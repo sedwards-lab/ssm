@@ -32,12 +32,13 @@ struct act {
 struct trigger {
   struct trigger *next;      /** Next sensitive trigger, if any */
   struct trigger **prev_ptr; /** Pointer to ourself in previous list element */
-  struct act *rar;           /** Routine triggered by this channel variable */
-  sel_t start, span;         /* FIXME */
+  struct act *act;           /** Routine triggered by this channel variable */
+  sel_t selector, span;      /* FIXME */
 };
 
 /**
- * Adds the trigger to the cvt, i.e., have rar->trigger to wait on cvt.
+ * Adds the trigger to the sv, i.e., have the activation record wait on
+ * a scheduled variable.
  */
 extern void sensitize(struct sv *, struct trigger *);
 

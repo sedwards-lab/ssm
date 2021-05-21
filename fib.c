@@ -87,6 +87,12 @@ int main(int argc, char *argv[]) {
   initialize_i32(&result, 0);
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
+  /*
+   * Note we don't even call tick() here, and instead directly invoke fib's step
+   * function (essentially doing tick()'s job). This is not really how the
+   * runtime is supposed to behave, but it is a nice test case that allows us to
+   * sidestep tick()'s implementation.
+   */
   struct act top = {.step = top_return};
   act_call(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT,
                      PTR_OF_SV(result.sv), n));
