@@ -58,8 +58,9 @@ Module.symvers
 Mkfile.old
 dkms.conf
 
-# CCLS
+# LSP/IDE
 .ccls-cache
+compile_commands.json
 
 # Valgrind
 vgcore.*
