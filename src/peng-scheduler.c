@@ -22,8 +22,8 @@ extern inline act_t *enter(size_t, stepf_t *,
 extern inline void call(act_t *);
 extern inline bool event_on(sv_t *);
 
-void sift_down(event_queue_index_t i);
-void sift_up(event_queue_index_t i);
+void sift_down(event_queue_index_t i, sv_t* to_sift);
+void sift_up(event_queue_index_t i, sv_t* to_sift);
 
 #define CONT_QUEUE_SIZE 8192
 cont_queue_index_t cont_queue_len = 0;
@@ -65,6 +65,49 @@ void desensitize(trigger_t *trigger)
     trigger->next->prev_ptr = trigger->prev_ptr; // Tell successor its predecessor is our predecessor
 }
 
+/*
+ * Verify that the heap property of the event queue holds. As far as I remember, the
+ * heap property only states that the priority of any node should be (for a min heap),
+ * equal to or greater than the priority of its parent.
+ */
+bool event_heap_property(event_queue_index_t i) {
+    /* 
+     * if we've passed the end of the event queue without finding any errors,
+     * the heap property held up.
+     */
+    if(i > event_queue_len) {
+        return 1;
+    }
+
+    /*
+     * Calculate indexes for the left and right child
+     */ 
+    event_queue_index_t left_child  = i << 1;
+    event_queue_index_t right_child = left_child + 1;
+
+    /*
+     * If this node has a parent, we need to calculate the index of the parent so that we
+     * can verify that this node has an event_time that is bigger than or equal to
+     * the parents time. Aside from this, we also need to verify the heap property of
+     * this node's children.
+     */
+    if (i > 1) {
+      event_queue_index_t parent      = i >> 1;
+      bool res = event_queue[parent]->event_time <= event_queue[i]->event_time &&
+             event_heap_property(left_child) &&
+             event_heap_property(right_child);
+     // printf("node:  %lu\nparent: %lu\n", event_queue[i]->event_time
+     //                                   , event_queue[parent]->event_time);
+      return res;
+    }
+
+    /*
+     * If this node does not have a parent we just need to verify the heap property of
+     * the children.
+     */
+    return event_heap_property(left_child) && event_heap_property(right_child);
+}
+
 /* Enqueue an event in the event queue. This function assumes the variable we
  * are inserting is not already present in the queue.
  */
@@ -76,14 +119,13 @@ void enqueue_event(sv_t *var, peng_time_t then) {
   event_queue_index_t i = ++event_queue_len;
   var->event_time = then;
   assert (i <= EVENT_QUEUE_SIZE);
-  event_queue[i] = var;
-  sift_up(i);
+  //event_queue[i] = var;
+  sift_up(i, var);
 }
 
 sv_t* dequeue_minimum() {
   sv_t *earliest = event_queue[1];
-  event_queue[1] = event_queue[event_queue_len--];
-  sift_down(1);
+  sift_down(1, event_queue[event_queue_len--]);
   return earliest;
 }
 
@@ -97,18 +139,22 @@ void dequeue_event(sv_t *var) {
   event_queue_index_t i = 1;
   // this search can be made better, but it was not clear to me if the children
   // were ordered in any way. I am not sure which child to 'follow'.
-  while(i < event_queue_len && event_queue[i] != var) {
+  while(i <= event_queue_len && event_queue[i] != var) {
     i++;
   }
 
-  event_queue[i] = event_queue[event_queue_len--];
-  sift_down(i);
+  sv_t* to_insert = event_queue[event_queue_len--];
+  event_queue_index_t parent = i >> 1;
+  if(to_insert->event_time > event_queue[parent]->event_time) {
+    sift_down(i, to_insert);
+  } else {
+    sift_up(i, to_insert);
+  }
 }
 
 // sift the element at index i down to its proper place.
-void sift_down(event_queue_index_t i) {
-
-    peng_time_t then           = event_queue[i]->event_time;
+void sift_down(event_queue_index_t i, sv_t* to_sift) {
+    peng_time_t then           = to_sift->event_time;
     event_queue_index_t parent = i;
 
     for (;;) {
@@ -126,30 +172,22 @@ void sift_down(event_queue_index_t i) {
           break;
       }
       // otherwise the element we are looking at should be sifted down one step
-      sv_t *elem          = event_queue[parent];
       event_queue[parent] = event_queue[child];
-      event_queue[child]  = elem;
       parent              = child;
     }
+    event_queue[parent] = to_sift;
+
+    assert(event_heap_property(1));
 }
 
 // sift the element at index i up to its right place
-void sift_up(event_queue_index_t i) {
-  event_queue_index_t child = i;
-  while(child > 1) {
-    sv_t *elem = event_queue[child];
-    event_queue_index_t parent = child >> 1;
-    // if the event time of the child is smaller than that of the parent,
-    // replace the child with the parent and sift again
-    if(elem->event_time < event_queue[parent]->event_time) {
-      event_queue[child] = event_queue[parent];
-      event_queue[parent] = elem;
-      child = parent;
-    // otherwise the child is in the right place and we should not sift anymore
-    } else {
-      return;
-    }
+void sift_up(event_queue_index_t i, sv_t* to_sift) {
+
+  event_queue_index_t hole = i;
+  for(; hole > 1 && event_queue[hole >> 1]->event_time > to_sift->event_time; hole >>= 1) {
+    event_queue[hole] = event_queue[hole >> 1];
   }
+  event_queue[hole] = to_sift;
 }
 
 void later_event(sv_t *var, peng_time_t then)
@@ -233,10 +271,16 @@ peng_time_t next_event_time()
 
 void printdeadlines() {
   event_queue_index_t i = 1;
+  printf("[");
   while(i <= event_queue_len) {
-//    printf("deadline of event %d is %lu\n", i, ((sv_t *)event_queue[i])->event_time);
+    if(i == event_queue_len) {
+      printf("{index: %d, time: %lu}", i, ((sv_t *)event_queue[i])->event_time);
+      break;
+    }
+    printf("{index: %d, time: %lu}, ", i, ((sv_t *)event_queue[i])->event_time);
     i++;
   }
+  printf("]\n");
 }
 
 void tick()
@@ -250,7 +294,9 @@ void tick()
 #endif
 
   while ( event_queue_len > 0 && event_queue[1]->event_time == now ) {
+    assert(event_heap_property(1));
     sv_t *var = dequeue_minimum();
+    assert(event_heap_property(1));
     
     (*var->update)(var);     // Update the value
 #ifdef DEBUG
@@ -271,8 +317,12 @@ void tick()
 
     // Remove the earliest event from the queue
     var->event_time = NO_EVENT_SCHEDULED;
-
+    assert(event_heap_property(1));
   }
+
+#ifdef DEBUG
+    DEBUG_PRINT("numconts %d\n", cont_queue_len);
+#endif
 
   // Until the queue is empty, take the lowest-numbered continuation from
   // the queue and run it, which might insert additional continuations
