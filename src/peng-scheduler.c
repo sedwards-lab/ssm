@@ -227,8 +227,15 @@ void schedule_sensitive(sv_t *var, priority_t priority)
 {
   assert(var);
   for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next)
-    if (trigger->act->priority > priority)
+    if (trigger->act->priority > priority) {
+#ifdef DEBUG
+      if(!can_fork()) {
+          printf("contqueue full\n");
+          exit(1);
+      }
+#endif
       enqueue( trigger->act );
+    }
 }
 
 void fork_routine(act_t *act)
