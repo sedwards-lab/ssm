@@ -203,6 +203,7 @@ void later_event(sv_t *var, peng_time_t then)
 void enqueue(act_t *cont)
 {
   assert(cont);
+  DEBUG_ASSERT(((int8_t) cont->depth) >= 0, "negative depth\n");
   if (cont->scheduled) return; // Don't add a continuation twice
 
   priority_t priority = cont->priority;
