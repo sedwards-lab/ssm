@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <assert.h>
+#include "peng-debug.h"
 
 typedef uint64_t uint64;
 typedef int64_t int64;
@@ -152,5 +153,8 @@ extern act_t *cont_queue[];
 extern peng_time_t next_event_time(void); // Time of the next event
 
 extern void tick(void); // Execute the system for the current instant
+
+extern int can_schedule(sv_t *);
+extern void dequeue_event(sv_t *);
 
 #endif /* _PENG_BASE_H */

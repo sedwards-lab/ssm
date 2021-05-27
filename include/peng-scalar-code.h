@@ -37,11 +37,13 @@ void assign_##type(sv_##type##_t *iv, priority_t priority, type value) \
   schedule_sensitive((sv_t *) iv, priority); \
 } \
 \
-void later_##type(sv_##type##_t *var, peng_time_t time, type val) \
+void later_##type(sv_##type##_t *var, peng_time_t then, type val) \
 { \
   assert(var); \
+  DEBUG_ASSERT(now < then, "bad after\n"); \
+  DEBUG_ASSERT(can_schedule((sv_t *) var), "eventqueue full\n"); \
   var->event_value = val; \
-  later_event((sv_t *) var, time); \
+  later_event((sv_t *) var, then); \
 }
 
 #endif

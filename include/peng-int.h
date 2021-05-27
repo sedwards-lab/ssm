@@ -3,6 +3,7 @@
 
 #include "peng-scalar.h"
 
-PENG_SCALAR_HEADERS(int)
+typedef int int32;
+PENG_SCALAR_HEADERS(int32)
 
 #endif /* _PENG_INT_H */

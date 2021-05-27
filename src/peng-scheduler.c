@@ -33,18 +33,12 @@ act_t *cont_queue[CONT_QUEUE_SIZE+1];
 event_queue_index_t event_queue_len = 0;
 sv_t *event_queue[EVENT_QUEUE_SIZE+1];
 
-#ifdef DEBUG
+/** Only used for debugging */
 int can_schedule(sv_t *var) {
   if(var->event_time == NO_EVENT_SCHEDULED) {
     return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
   }
 }
-
-int can_fork() {
-  return (cont_queue_len + 1 <= CONT_QUEUE_SIZE);
-}
-#endif
-
 void sensitize(sv_t *var, trigger_t *trigger)
 {
   assert(var);
@@ -228,12 +222,7 @@ void schedule_sensitive(sv_t *var, priority_t priority)
   assert(var);
   for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next)
     if (trigger->act->priority > priority) {
-#ifdef DEBUG
-      if(!can_fork()) {
-          printf("contqueue full\n");
-          exit(1);
-      }
-#endif
+      DEBUG_ASSERT(cont_queue_len + 1 <= CONT_QUEUE_SIZE, "contqueue full\n");
       enqueue( trigger->act );
     }
 }
@@ -296,29 +285,23 @@ void tick()
   // remove the event from the queue, update its variable, and schedule
   // everything sensitive to it
 
-#ifdef DEBUG
-  char buffer[50];
-#endif
-
   while ( event_queue_len > 0 && event_queue[1]->event_time == now ) {
     assert(event_heap_property(1));
     sv_t *var = dequeue_minimum();
     assert(event_heap_property(1));
     
     (*var->update)(var);     // Update the value
+
 #ifdef DEBUG
-    var->to_string(var, buffer, 50);
+    char buffer[50];
+    var->to_string(var, buffer, sizeof(buffer));
     DEBUG_PRINT("event %lu value %s\n", now, buffer);
 #endif
+
     var->last_updated = now; // Remember that it was updated
     // Schedule all sensitive continuations
     for (trigger_t *trigger = var->triggers ; trigger ; trigger = trigger->next) {
-#ifdef DEBUG
-      if(!can_fork()) {
-        printf("contqueue full\n");
-        exit(1);
-      }
-#endif
+      DEBUG_ASSERT(cont_queue_len + 1 <= CONT_QUEUE_SIZE, "contqueue full\n");
       enqueue(trigger->act);
     }
 
@@ -327,9 +310,7 @@ void tick()
     assert(event_heap_property(1));
   }
 
-#ifdef DEBUG
     DEBUG_PRINT("numconts %d\n", cont_queue_len);
-#endif
 
   // Until the queue is empty, take the lowest-numbered continuation from
   // the queue and run it, which might insert additional continuations
