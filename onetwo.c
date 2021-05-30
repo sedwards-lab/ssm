@@ -1,27 +1,28 @@
+/**
+ * onetwo example from paper:
+ *
+ *   one &a
+ *     wait a
+ *     a = a + 1
+ *
+ *   two &a
+ *     wait a
+ *     a = a * 2
+ *
+ *   main
+ *     var a = 0
+ *     after 1s a = 10
+ *     fork one(a) two(a)
+ *     // a = 22 here
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ssm-act.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
-
-/*
-one &a
-  wait a
-  a = a + 1
-
-two &a
-  wait a
-  a = a * 2
-
-main
-  var a = 0
-  after 1s a = 10
-  fork one(a) two(a)
-  // a = 22 here
-
-
- */
+#include "ssm-debug.h"
 
 typedef struct {
   struct act act;
@@ -46,12 +47,11 @@ struct act *enter_one(struct act *cont, priority_t priority, depth_t depth,
                       ptr_i32_svt a) {
   struct act *act =
       act_enter(sizeof(act_one_t), step_one, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "one");
+
   act_one_t *ac = container_of(act, act_one_t, act);
 
   ac->a = a;
-#ifdef DEBUG
-  act->act_name = "one";
-#endif
 
   return act;
 }
@@ -80,11 +80,11 @@ struct act *enter_two(struct act *cont, priority_t priority, depth_t depth,
                       ptr_i32_svt a) {
   struct act *act =
       act_enter(sizeof(act_two_t), step_two, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "two");
+
   act_two_t *ac = container_of(act, act_two_t, act);
   ac->a = a;
-#ifdef DEBUG
-  act->act_name = "two";
-#endif
+
   return act;
 }
 
@@ -110,13 +110,13 @@ stepf_t step_main;
 struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
   struct act *act =
       act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "main");
   act_main_t *a = container_of(act, act_main_t, act);
-  initialize_event(&a->a.sv, &i32_vtable);
-  a->a.sv.var_name = "a";
 
-#ifdef DEBUG
-  act->act_name = "main";
-#endif
+  initialize_event(&a->a.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->a.sv, "a");
+
+  a->a.sv.var_name = "a";
 
   return act;
 }
@@ -152,6 +152,8 @@ int main() {
   initialize_ssm(0);
 
   struct act top = {.step = top_return};
+  DEBUG_ACT_NAME(&top, "top");
+
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())

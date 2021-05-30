@@ -1,50 +1,55 @@
+/**
+ * Synchronous counter example using pass-by-reference variables
+ *
+ *   def clock clk : int ref =
+ *     var timer : event
+ *     loop
+ *       after 100 timer = Event       await 100ms
+ *       await @timer
+ *       clk = True
+ *       after 100 timer = Event
+ *       await @timer
+ *       clk = False
+ *
+ *   def dff clk d q : int ref =
+ *     loop
+ *       await
+ *          clk: q = d
+ *
+ *   def inc a y : int ref =
+ *     loop
+ *       await
+ *         @a: y = a + 1
+ *
+ *   def adder (a b y : int ref) : void =
+ *      loop
+ *        await
+ *          @a or @b: y = a + b
+ *
+ *   def main : void =         // priority 0000....
+ *     var clk : bool
+ *     var q1 d1 q2 d2 : int
+ *
+ *     clock(clk)              // priority 0000....
+ *     || dff(clk, d1, q1)     //          0010....
+ *                             //          0010....  first child
+ *                             //          0011....  second child
+ *     || dff(clk, d2, q2 + 1) //          0100....
+ *     || inc(q2, d2)          //          0110....
+ *     || adder(q1, d2, d1)    //          1000....
+ *
+ * Note that this long-running example will only run for a finite number of
+ * ticks, and doesn't bother freeing allocated memory before exiting, so it will
+ * leak memory.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ssm-act.h"
+#include "ssm-debug.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
-
-/* Synchronous counter example using pass-by-reference variables
-
-def clock clk : int ref =
-  var timer : event
-  loop
-    after 100 timer = Event       await 100ms
-    await @timer
-    clk = True
-    after 100 timer = Event
-    await @timer
-    clk = False
-
-def dff clk d q : int ref =
-  loop
-    await
-       clk: q = d
-
-def inc a y : int ref =
-  loop
-    await
-      @a: y = a + 1
-
-def adder (a b y : int ref) : void =
-   loop
-     await
-       @a or @b: y = a + b
-
-def main : void =         // priority 0000....
-  var clk : bool
-  var q1 d1 q2 d2 : int
-
-  clock(clk)              // priority 0000....
-  || dff(clk, d1, q1)     //          0010....
-                          //          0010....  first child
-                          //          0011....  second child
-  || dff(clk, d2, q2 + 1) //          0100....
-  || inc(q2, d2)          //          0110....
-  || adder(q1, d2, d1)    //          1000....
-
- */
 
 typedef struct {
   struct act act;
@@ -86,9 +91,13 @@ struct act *enter_clock(struct act *parent, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(act_clock_t), step_clock, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "clock");
   act_clock_t *a = container_of(act, act_clock_t, act);
+
   a->clk = clk;
+
   initialize_event(&a->timer, unit_vtable);
+  DEBUG_SV_NAME(&a->timer, "timer");
 
   return act;
 }
@@ -141,6 +150,7 @@ struct act *enter_dff(struct act *parent, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(act_dff_t), step_dff, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "dff");
   act_dff_t *a = container_of(act, act_dff_t, act);
 
   a->clk = clk;
@@ -184,6 +194,7 @@ struct act *enter_inc(struct act *parent, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(act_inc_t), step_inc, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "inc");
   act_inc_t *ac = container_of(act, act_inc_t, act);
 
   ac->a = a;
@@ -223,6 +234,7 @@ struct act *enter_adder(struct act *parent, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(act_adder_t), step_adder, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "adder");
   act_adder_t *ac = container_of(act, act_adder_t, act);
 
   ac->a = a;
@@ -265,13 +277,23 @@ stepf_t step_main;
 struct act *enter_main(struct act *parent, priority_t priority, depth_t depth) {
   struct act *act =
       act_enter(sizeof(act_main_t), step_main, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "main");
   act_main_t *a = container_of(act, act_main_t, act);
 
   initialize_event(&a->clk.sv, &bool_vtable);
+  DEBUG_SV_NAME(&a->clk.sv, "clk");
+
   initialize_event(&a->d1.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->d1.sv, "d1");
+
   initialize_event(&a->q1.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->q1.sv, "q1");
+
   initialize_event(&a->d2.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->d2.sv, "d2");
+
   initialize_event(&a->q2.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->q2.sv, "q2");
 
   return act;
 }
@@ -280,7 +302,7 @@ void step_main(struct act *act) {
   act_main_t *a = container_of(act, act_main_t, act);
 
   switch (act->pc) {
-  case 0: {                             /* fork */
+  case 0: { /* fork */
     a->clk.value = false;
     a->d1.value = 0;
     a->d2.value = 0;
@@ -331,6 +353,8 @@ int main(int argc, char *argv[]) {
   initialize_ssm(0);
 
   struct act top = {.step = main_return};
+  DEBUG_ACT_NAME(&top, "top");
+
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 

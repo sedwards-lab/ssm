@@ -1,22 +1,23 @@
+/**
+ * Recursive fib implementation using references but without any waiting:
+ *
+ *   fib n &r
+ *     var r2 = 0
+ *     if n < 2 then r = 1 else
+ *       fork fib(n-1, r) fib(n-2, r2)
+ *       r = r + r2
+ *
+ * 0 1 2 3 4 5  6  7  8  9 10  11  12  13
+ * 1 1 2 3 5 8 13 21 34 55 89 144 233 377
+ */
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ssm-act.h"
+#include "ssm-debug.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
 
-/*
-
-fib n &r
-  var r2 = 0
-  if n < 2 then r = 1 else
-    fork fib(n-1, r) fib(n-2, r2)
-    r = r + r2
-
-0 1 2 3 4 5  6  7  8  9 10  11  12  13
-1 1 2 3 5 8 13 21 34 55 89 144 233 377
-
- */
 typedef struct {
   struct act act;
 
@@ -32,10 +33,14 @@ struct act *enter_fib(struct act *cont, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(fib_act_t), step_fib, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "fib");
   fib_act_t *a = container_of(act, fib_act_t, act);
+
   a->n = n;
   a->r = r;
+
   initialize_event(&a->r2.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->r2.sv, "r2");
 
   return act;
 }
@@ -76,9 +81,12 @@ int main(int argc, char *argv[]) {
 
   i32_svt result;
   initialize_event(&result.sv, &i32_vtable);
+  DEBUG_SV_NAME(&result.sv, "result");
   result.value = 0;
 
   struct act top = {.step = top_return};
+  DEBUG_ACT_NAME(&top, "top");
+
   act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
                      PTR_OF_SV(result.sv)));
 

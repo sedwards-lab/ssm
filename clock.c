@@ -1,29 +1,30 @@
-#include "ssm-act.h"
-#include "ssm-runtime.h"
-#include "ssm-types.h"
+/**
+ * Simple time keeper
+ *
+ *   def second_clock second_event : event ref =
+ *      var timer : event
+ *      loop
+ *        seconds = Event
+ *        after 1s timer = Event
+ *        await @timer
+ *
+ *   def report_seconds second_event : event ref =
+ *      var seconds : int = 0
+ *      loop
+ *        await @second_event
+ *        seconds = seconds + 1
+ *        print(seconds)
+ *
+ *   def main : void =
+ *     var second : event
+ *       second_clock(second) || report_seconds(second)
+ */
 #include <stdio.h>
 
-/* Simple time keeper
-
-def second_clock second_event : event ref =
-   var timer : event
-   loop
-     seconds = Event
-     after 1s timer = Event
-     await @timer
-
-def report_seconds second_event : event ref =
-   var seconds : int = 0
-   loop
-     await @second_event
-     seconds = seconds + 1
-     print(seconds)
-
-def main : void =
-  var second : event
-    second_clock(second) || report_seconds(second)
-
- */
+#include "ssm-act.h"
+#include "ssm-debug.h"
+#include "ssm-runtime.h"
+#include "ssm-types.h"
 
 typedef struct {
   struct act act;
@@ -52,9 +53,13 @@ struct act *enter_second_clock(struct act *parent, priority_t priority,
 
   struct act *act = act_enter(sizeof(act_second_clock_t), step_second_clock,
                               parent, priority, depth);
+  DEBUG_ACT_NAME(act, "second_clock");
   act_second_clock_t *a = container_of(act, act_second_clock_t, act);
+
   a->second_event = second_event;
+
   initialize_event(&a->timer, unit_vtable);
+  DEBUG_SV_NAME(&a->timer, "timer");
 
   return act;
 }
@@ -93,9 +98,13 @@ struct act *enter_report_seconds(struct act *parent, priority_t priority,
 
   struct act *act = act_enter(sizeof(act_report_seconds_t), step_report_seconds,
                               parent, priority, depth);
+  DEBUG_ACT_NAME(act, "report_seconds");
   act_report_seconds_t *a = container_of(act, act_report_seconds_t, act);
+
   a->second_event = second_event;
+
   initialize_event(&a->seconds.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->seconds.sv, "seconds");
 
   return act;
 }
@@ -135,10 +144,13 @@ struct act *enter_main(struct act *parent, priority_t priority, depth_t depth) {
 
   struct act *act =
       act_enter(sizeof(act_main_t), step_main, parent, priority, depth);
+  DEBUG_ACT_NAME(act, "main");
   act_main_t *a = container_of(act, act_main_t, act);
 
   /* Initialize managed variables */
   initialize_event(&a->second, unit_vtable);
+  DEBUG_SV_NAME(&a->second, "second");
+
   return act;
 }
 
@@ -176,6 +188,8 @@ int main(int argc, char *argv[]) {
   initialize_ssm(0);
 
   struct act top = {.step = main_return};
+  DEBUG_ACT_NAME(&top, "top");
+
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 

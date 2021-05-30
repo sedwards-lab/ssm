@@ -1,28 +1,30 @@
+/**
+ * Blocking, recursive implementation of fib that only assigns to variables
+ * after 1s:
+ *
+ *   mywait &r
+ *     wait r
+ *
+ *   sum &r1 &r2 &r
+ *     fork mywait(r1) mywait(r2)
+ *     after 1s r = r1 + r2
+ *
+ *   fib n &r
+ *     var r1 = 0
+ *     var r2 = 0
+ *     if n < 2 then after 1s r = 1 else
+ *       fork sum(r1, r2, r)  fib(n-1, r1)  fib(n-2, r2)
+ *
+ * 0 1 2 3 4 5  6  7  8  9 10  11  12  13
+ * 1 1 2 3 5 8 13 21 34 55 89 144 233 377
+ */
 #include <stdio.h>
 #include <stdlib.h>
 
 #include "ssm-act.h"
+#include "ssm-debug.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
-
-/*
-mywait &r
-  wait r
-
-sum &r1 &r2 &r
-  fork mywait(r1) mywait(r2)
-  after 1s r = r1 + r2
-
-fib n &r
-  var r1 = 0
-  var r2 = 0
-  if n < 2 then after 1s r = 1 else
-    fork sum(r1, r2, r)  fib(n-1, r1)  fib(n-2, r2)
-
-0 1 2 3 4 5  6  7  8  9 10  11  12  13
-1 1 2 3 5 8 13 21 34 55 89 144 233 377
-
- */
 
 typedef struct {
   struct act act;
@@ -39,8 +41,8 @@ typedef struct {
 typedef struct {
   struct act act;
 
-  int n;         // Local variable
-  ptr_i32_svt r; // Where we should write our result
+  int n;         /* Local variable */
+  ptr_i32_svt r; /* Where we should write our result */
   i32_svt r1, r2;
 } act_fib_t;
 
@@ -50,8 +52,11 @@ struct act *enter_mywait(struct act *cont, priority_t priority, depth_t depth,
                          ptr_i32_svt r) {
   struct act *act =
       act_enter(sizeof(act_mywait_t), step_mywait, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "mywait");
   act_mywait_t *a = container_of(act, act_mywait_t, act);
+
   a->r = r;
+
   return act;
 }
 
@@ -78,10 +83,13 @@ struct act *enter_sum(struct act *cont, priority_t priority, depth_t depth,
 
   struct act *act =
       act_enter(sizeof(act_sum_t), step_sum, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "sum");
   act_sum_t *a = container_of(act, act_sum_t, act);
+
   a->r1 = r1;
   a->r2 = r2;
   a->r = r;
+
   return act;
 }
 
@@ -156,10 +164,14 @@ void top_return(struct act *cont) { return; }
 int main(int argc, char *argv[]) {
   i32_svt result;
   initialize_event(&result.sv, &i32_vtable);
+  DEBUG_SV_NAME(&result.sv, "result");
   result.value = 0;
+
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
   struct act top = {.step = top_return};
+  DEBUG_ACT_NAME(&top, "top");
+
   act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
                      PTR_OF_SV(result.sv)));
 
