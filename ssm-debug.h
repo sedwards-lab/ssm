@@ -6,6 +6,7 @@
 /** Attach a procedure name to an activation record struct */
 #define DEBUG_ACT_NAME(act, name) (act)->act_name = (name)
 
+/** Attach a variable name to a scheduled variable struct */
 #define DEBUG_SV_NAME(sv, name) (sv)->var_name = (name)
 
 #else

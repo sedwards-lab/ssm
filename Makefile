@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -g -Wall -pedantic -std=c99 -DDEBUG
+CFLAGS = -g -Wall -pedantic -std=c99 # -DDEBUG
 
 EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
