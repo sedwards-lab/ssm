@@ -27,14 +27,13 @@ typedef uint64_t ssm_time_t;
 /** Thread priority */
 typedef uint32_t priority_t;
 
-/** TODO: docstring */
-#define PRIORITY_AT_ROOT                                                       \
-  1 /* TODO: was 0, check that bumping this to 1 is fine */
+/** The priority at the entry point of an SSM program. */
+#define PRIORITY_AT_ROOT              0
 
 /** Index of least significant priority bit */
 typedef uint8_t depth_t;
 
-/** TODO: docstring */
+/** The depth at the entry point of an SSM program. */
 #define DEPTH_AT_ROOT 32
 
 /**

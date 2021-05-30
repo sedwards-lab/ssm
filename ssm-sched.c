@@ -53,13 +53,22 @@ static struct act *unschedule_act(idx_t idx) {
 }
 
 /**
- * Enqueue all the sensitive continuations of a scheduled variable.
+ * Enqueue lower priority sensitive continuations of a scheduled variable.
  */
 static void schedule_sensitive_triggers(struct sv *sv, priority_t priority) {
   for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
-    if (trigger->act->priority > priority) 
+    if (trigger->act->priority > priority)
       if (!trigger->act->scheduled)
         schedule_act(trigger->act);
+}
+
+/**
+ * Enqueue all the sensitive continuations of a scheduled variable.
+ */
+static void schedule_all_sensitive_triggers(struct sv *sv) {
+  for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
+    if (!trigger->act->scheduled)
+      schedule_act(trigger->act);
 }
 
 /**
@@ -74,17 +83,16 @@ static void update_event(struct sv *sv) {
   printf("update event: %s\n", sv->var_name);
 #endif
   if (sv->vtable)
-    /* Non-unit type, so we need to call update method to update payload */
+  /* Non-unit type, so we need to call update method to update payload */
 #ifdef DEBUG
     printf("calling update: %s\n", sv->vtable->type_name),
 #endif
-      sv->vtable->update(sv);
+        sv->vtable->update(sv);
 
   sv->later_time = NO_EVENT_SCHEDULED;
   sv->last_updated = sv->later_time;
 
-  /* FIXME: don't use dummy values for priority */
-  schedule_sensitive_triggers(sv, 0);
+  schedule_all_sensitive_triggers(sv);
 }
 
 /*** Internal helpers }}} ***/
@@ -134,9 +142,7 @@ void later_event(struct sv *sv, ssm_time_t then) {
   }
 }
 
-ssm_time_t last_updated_event(struct sv *sv) {
-  return sv->last_updated;
-}
+ssm_time_t last_updated_event(struct sv *sv) { return sv->last_updated; }
 
 /*** Events API }}} ***/
 
@@ -182,9 +188,7 @@ void desensitize(struct trigger *trigger) {
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
 
-void initialize_ssm(ssm_time_t start) {
-  now = start;
-}
+void initialize_ssm(ssm_time_t start) { now = start; }
 
 ssm_time_t tick() {
 #ifdef DEBUG
@@ -218,7 +222,8 @@ ssm_time_t tick() {
    * tries to schedule itself.
    */
 #ifdef DEBUG
-  printf("running activation records now. act_queue_len: %lu.\n", act_queue_len);
+  printf("running activation records now. act_queue_len: %lu.\n",
+         act_queue_len);
   for (int i = 0; i < act_queue_len; i++)
     printf("\tact: %s\n", act_queue[QUEUE_HEAD + i]->act_name);
 #endif
@@ -226,7 +231,8 @@ ssm_time_t tick() {
   while (act_queue_len > 0) {
     struct act *to_run = unschedule_act(QUEUE_HEAD);
 #ifdef DEBUG
-    printf("Running routine: %s (act_queue_len: %ld)\n", to_run->act_name, act_queue_len);
+    printf("Running routine: %s (act_queue_len: %ld)\n", to_run->act_name,
+           act_queue_len);
 #endif
     to_run->step(to_run);
   }
@@ -236,7 +242,7 @@ ssm_time_t tick() {
    * able to interrupt sooner than now, so that it can respond to I/O etc.
    */
   now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                             : NO_EVENT_SCHEDULED;
+                            : NO_EVENT_SCHEDULED;
   return now;
 }
 
