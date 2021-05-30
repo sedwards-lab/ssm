@@ -64,3 +64,6 @@ compile_commands.json
 
 # Valgrind
 vgcore.*
+
+# Test binaries
+*-test

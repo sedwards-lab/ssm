@@ -7,7 +7,18 @@ obj_EXE = $(foreach e, $(EXE), $(e).o)
 SSMLIB = ssm-types ssm-queue ssm-sched
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
 
-all : $(EXE)
+TESTS = ssm-queue-test
+obj_TESTS = $(foreach e, $(TESTS), $(e).o)
+
+.PHONY: default tests all clean
+default: $(EXE)
+tests: $(TESTS)
+all : clean default tests
+clean :
+	rm -rf *.o *.gch vgcore.* $(EXE) $(TESTS)
+
+compile_commands.json: Makefile
+	bear make all
 
 $(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h
 
@@ -32,9 +43,6 @@ clock : clock.o $(obj_SSMLIB)
 onetwo : onetwo.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
-compile_commands.json: Makefile
-	bear make all
+ssm-queue-test: ssm-queue.o
 
-.PHONY : clean
-clean :
-	rm -rf *.o *.gch vgcore.* $(EXE)
+ssm-queue-test.o : ssm-queue.h ssm-queue-test.h
