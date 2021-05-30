@@ -35,7 +35,7 @@ ssm_time_t now; /* FIXME: Should we initialize? */
 static void schedule_act(struct act *act) {
   if (!act->scheduled)
     enqueue_act(act_queue, &act_queue_len, act);
-  act->scheduled = 1;
+  act->scheduled = true;
 }
 
 static struct act *unschedule_act(idx_t idx) {
