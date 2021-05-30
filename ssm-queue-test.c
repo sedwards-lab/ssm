@@ -1,8 +1,16 @@
 /**
  * Poor man's property testing for the binary heap implementation in
- * ssm-queue.c.
+ * ssm-queue.c. The specification of each heap operation is asserted by the
+ * enqueue, dequeue, and requeue wrapper functions.
  *
+ * The test_heap_sort function tests uses heap sort to reverse increasing
+ * sequences of integers. TODO: randomly permute integer sequences.
  *
+ * The test_chaos function generates a random array, heapifies it, and subjects
+ * it to random operations.
+ *
+ * The number of iterations and the seed for the randomness can be controlled
+ * by command line parameters (see main).
  */
 #include "ssm-queue-test.h"
 #include <assert.h>
@@ -28,10 +36,13 @@
  */
 #define choose(lhs, rhs) for ((lhs) = (rhs); (lhs) == MAGIC_VAL; (lhs) = (rhs))
 
+#ifdef DEBUG
 #define DBG(stmt) stmt
-/* #define DBG(stmt)                                                              \ */
-/*   do {                                                                         \ */
-/*   } while (0) */
+#else
+#define DBG(stmt)                                                              \
+  do {                                                                         \
+  } while (0)
+#endif
 
 /**
  * Print the contents of a 1-indexed integer array.
@@ -82,6 +93,7 @@ long *remember_members(long *a) {
 
   long *ms = (long *)malloc(size);
   if (ms == NULL) {
+    /* Don't even bother trying to recover from this */
     perror("malloc");
     exit(1);
   }
@@ -304,6 +316,9 @@ err:
 int heapify(long *a) {
   size_t len = a[QUEUE_LEN];
 
+  DBG(printf("Heapify:\n"));
+  DBG(print_queue(a));
+
   a[QUEUE_LEN] = 1;
   for (idx_t i = QUEUE_HEAD + 1; i < len + QUEUE_HEAD; i++)
     if (enqueue(a, a[i]) != OK)
@@ -361,8 +376,17 @@ err:
   return ERR;
 }
 
+/**
+ * Create a sequence of integers from [1..len], heapify it (should be a nop),
+ * and then repeatedly dequeue the head of the queue and place it at the end.
+ * The end result should be the reversed sequence [len..1].
+ */
 int test_heap_sort_seq(const size_t len) {
   long *a = malloc((len + QUEUE_HEAD) * sizeof(long));
+  if (a == NULL) {
+    perror("heap_sort_seq malloc");
+    exit(1);
+  }
 
   for (idx_t i = QUEUE_HEAD; i < len + QUEUE_HEAD; i++)
     a[i] = i;
@@ -399,10 +423,26 @@ err:
   return ERR;
 }
 
-void test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
+/**
+ * Test heap sort up for all array sequences up to the given bound.
+ */
+int test_heap_sort(unsigned int bound) {
+  for (int i = 1; i < bound; i++)
+    test_heap_sort_seq(i);
+  return 0;
+}
+
+/**
+ * Create a random array, heapify it, and subject it to random heap operations.
+ */
+int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
   srand(seed);
 
   long *a = malloc((max_len + 1) * sizeof(long));
+  if (a == NULL) {
+    perror("heap_sort_seq malloc");
+    exit(1);
+  }
 
   size_t len = 0;
   while (len == 0)
@@ -416,6 +456,7 @@ void test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
   heapify(a);
 
   while (iters--) {
+    DBG(printf("test_chaos: iteration %d\n", iters));
   retry:
     switch (rand() % 3) {
     case 0: {
@@ -426,7 +467,7 @@ void test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
       choose(x, rand());
 
       if (enqueue(a, x) != OK)
-        goto out;
+        goto err;
       break;
     }
     case 1: {
@@ -437,7 +478,7 @@ void test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
       choose(idx, (rand() % a[QUEUE_LEN]) + QUEUE_HEAD);
 
       if (dequeue(a, idx) != OK)
-        goto out;
+        goto err;
       break;
     }
     default: {
@@ -453,26 +494,30 @@ void test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
       a[idx] = x;
 
       if (requeue(a, idx) != OK)
-        goto out;
+        goto err;
 
       break;
     }
     }
   }
 
-out:
   free(a);
+  return OK;
+
+err:
+  printf("context: test_chaos\n");
+  free(a);
+  return ERR;
 }
 
-int test_heap_sort(void) {
-  for (int i = 1; i < 128; i++)
-    test_heap_sort_seq(i);
-  return 0;
-}
-
+/**
+ * Usage:
+ *
+ *  ./ssm-queue-test [iters] [seed]
+ */
 int main(int argc, char **argv) {
 
-  test_heap_sort();
+  test_heap_sort(128);
 
   size_t iters = 1000;
   size_t seed = 42;
