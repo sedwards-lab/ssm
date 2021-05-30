@@ -3,6 +3,9 @@
  * events and abstract activation records.
  */
 
+#define _POSIX_C_SOURCE 199309L
+#include <time.h>
+
 #include "ssm-act.h"
 #include "ssm-queue.h"
 #include "ssm-runtime.h"
@@ -241,8 +244,27 @@ ssm_time_t tick() {
    * FIXME: this interface isn't really usable. We want the runtime driver to be
    * able to interrupt sooner than now, so that it can respond to I/O etc.
    */
-  now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                            : NO_EVENT_SCHEDULED;
+
+  ssm_time_t next = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
+                                        : NO_EVENT_SCHEDULED;
+
+  if (next != NO_EVENT_SCHEDULED) {
+    time_t secs = (next - now) / 1000000;
+    long ns = ((next - now) % 1000000) * 1000;
+
+    struct timespec dur, rem = { secs, ns };
+    while (1) {
+      if (!nanosleep(&dur, &rem)) {
+        break;
+      }
+
+      // Assuming nanosleep got interrupted...
+      dur = rem;
+      continue;
+    }
+  }
+
+  now = next;
   return now;
 }
 
