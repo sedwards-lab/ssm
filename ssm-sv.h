@@ -77,6 +77,8 @@ struct svtable {
    */
   void (*later)(struct sv *, ssm_time_t, const any_t);
 
+  const char *type_name;
+
   /**
    * Points to information about each member.
    *
@@ -85,8 +87,6 @@ struct svtable {
    * yet.
    */
   const struct payload_info *payload_info;
-
-  const char *type_name;
 };
 
 /**

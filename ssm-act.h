@@ -4,6 +4,10 @@
 /**
  * The interface shared between (generated) routine implementations and
  * ssm-sched.c. All function prototypes here are implemented in ssm-sched.c.
+ *
+ * Note that the act_enter and act_leave functions use malloc and free. These
+ * should be reimplemented using a custom allocator more suitable for realtime
+ * applications.
  */
 
 #include "ssm-core.h"
@@ -76,7 +80,7 @@ static inline struct act *act_enter(size_t bytes, stepf_t *step,
   assert(step);
   assert(parent);
   ++parent->children;
-  struct act *act = (struct act *)malloc(bytes); /* FIXME */
+  struct act *act = (struct act *)malloc(bytes);
   *act = (struct act){.step = step,
                       .caller = parent,
                       .pc = 0,

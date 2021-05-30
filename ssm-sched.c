@@ -28,7 +28,11 @@ size_t event_queue_len = 0;
 struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
 size_t act_queue_len = 0;
 
-ssm_time_t now; /* FIXME: Should we initialize? */
+/**
+ * Note that this starts out uninitialized. It is the responsibility of the
+ * runtime to do so.
+ */
+ssm_time_t now;
 
 /*** Internal helpers {{{ ***/
 
