@@ -259,7 +259,6 @@ ssm_time_t tick() {
 
       // Assuming nanosleep got interrupted...
       dur = rem;
-      continue;
     }
   }
 
