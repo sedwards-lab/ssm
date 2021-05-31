@@ -251,15 +251,8 @@ ssm_time_t tick() {
     time_t secs = (next - now) / 1000000;
     long ns = ((next - now) % 1000000) * 1000;
 
-    struct timespec dur, rem = { secs, ns };
-    while (1) {
-      if (!nanosleep(&dur, &rem)) {
-        break;
-      }
-
-      // Assuming nanosleep got interrupted...
-      dur = rem;
-    }
+    struct timespec dur = { secs, ns };
+    nanosleep(&dur, NULL);
   }
 
   now = next;
