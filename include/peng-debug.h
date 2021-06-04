@@ -1,41 +1,30 @@
+/**
+ * Default debug interface
+ *
+ * Each platform may define its own debugging facilities, but this file provides
+ * a default nop implementation (and documents the interface).
+ */
 #ifndef _PENG_DEBUG_H
 #define _PENG_DEBUG_H
 
-#ifdef DEBUG
-#define STRINGIFY(x) #x
-#define TOSTRING(x) STRINGIFY(x)
-#define AT __FILE__ ":" TOSTRING(__LINE__)
+#include <peng-platform.h>
 
-extern uint64_t debug_count;
-extern uint64_t limit;
-
-#define DEBUG_PRINT(...)                                                       \
-  {                                                                            \
-    if (debug_count >= limit) {                                                \
-      exit(1);                                                                 \
-    }                                                                          \
-    debug_count++;                                                             \
-    printf(__VA_ARGS__);                                                       \
-  }
-
-#define DEBUG_ASSERT(assertion, msg, ...)                                      \
+#ifndef DEBUG_TRACE
+#define DEBUG_TRACE(...)                                                       \
   do {                                                                         \
-    if (!(assertion)) {                                                        \
-      printf(msg, ##__VA_ARGS__);                                           \
-      exit(1);                                                                 \
-    }                                                                          \
   } while (0)
+#endif
 
-#else
-
+#ifndef DEBUG_PRINT
 #define DEBUG_PRINT(...)                                                       \
   do {                                                                         \
   } while (0)
+#endif
 
+#ifndef DEBUG_ASSERT
 #define DEBUG_ASSERT(assertion, ...)                                           \
   do {                                                                         \
   } while (0)
-
 #endif
 
 #endif /* ifndef _PENG_DEBUG_H */
