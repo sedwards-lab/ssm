@@ -4,10 +4,12 @@
 ##
 
 CPPFLAGS += -I $(RUNTIMEDIR)/include
+LDFLAGS += -lpeng
 
 vpath %.c $(RUNTIMEDIR)/src
 
-LIBSRC = peng-scheduler.c peng-int.c peng-bool.c
+RUNTIMESRC := peng-scheduler.c peng-int.c peng-bool.c
 
-# This becomes default goal if none are specified by the platform
-libpeng.a : libpeng.a($(LIBSRC:%.c=%.o))
+SRCS += $(RUNTIMESRC)
+
+libpeng.a : libpeng.a($(RUNTIMESRC:%.c=%.o))
