@@ -10,6 +10,8 @@
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
 
+#include "time-driver.h"
+
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
 
@@ -35,8 +37,6 @@ size_t act_queue_len = 0;
  * runtime to do so.
  */
 ssm_time_t now;
-
-struct timespec system_time;
 
 /*** Internal helpers {{{ ***/
 
@@ -194,25 +194,7 @@ void desensitize(struct trigger *trigger) {
 
 void initialize_ssm(ssm_time_t start) {
   now = start;
-  // init_runtime(now)
-  clock_gettime(CLOCK_MONOTONIC, &system_time);
-}
-
-static inline void timespec_diff(struct timespec *a, struct timespec *b,
-                                 struct timespec *result) {
-  result->tv_sec  = a->tv_sec  - b->tv_sec;
-  result->tv_nsec = a->tv_nsec - b->tv_nsec;
-  if (result->tv_nsec < 0) {
-      result->tv_sec--;
-      result->tv_nsec += 1000000000L;
-  }
-}
-
-bool timespec_lt(struct timespec *a, struct timespec *b) {
-    if (a->tv_sec == b->tv_sec)
-        return a->tv_nsec < b->tv_nsec;
-    else
-        return a->tv_sec < b->tv_sec;
+  initialize_time_driver();
 }
 
 ssm_time_t tick() {
@@ -267,33 +249,7 @@ ssm_time_t tick() {
    * able to interrupt sooner than now, so that it can respond to I/O etc.
    */
 
-  ssm_time_t next = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                                        : NO_EVENT_SCHEDULED;
-
-  if (next != NO_EVENT_SCHEDULED) {
-    time_t secs = (next - now) / 1000000;
-    long ns = ((next - now) % 1000000) * 1000;
-
-    struct timespec ssm_sleep_dur = { secs, ns };
-
-    struct timespec system_time_now;
-    clock_gettime(CLOCK_MONOTONIC, &system_time_now);
-
-    // get delta between last sleep
-    struct timespec delta;
-    timespec_diff(&system_time_now, &system_time, &delta);
-    // if delta > dur, dont sleep
-    if (timespec_lt(&delta, &ssm_sleep_dur)) {
-      struct timespec ssm_sleep_dur_adjusted;
-      timespec_diff(&ssm_sleep_dur, &delta, &ssm_sleep_dur_adjusted);
-      nanosleep(&ssm_sleep_dur_adjusted, NULL);
-    }
-  }
-
-  now = next;
-  clock_gettime(CLOCK_MONOTONIC, &system_time);
-
-  return now;
+  return timestep();
 }
 
 /*** Runtime API }}} ***/

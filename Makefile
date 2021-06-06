@@ -4,7 +4,7 @@ CFLAGS = -g -Wall -pedantic # -DDEBUG
 EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
 
-SSMLIB = ssm-types ssm-queue ssm-sched
+SSMLIB = ssm-types ssm-queue ssm-sched linux-time
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
 
 TESTS = ssm-queue-test
@@ -20,7 +20,7 @@ clean :
 compile_commands.json: Makefile
 	bear make all
 
-$(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h
+$(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h time-driver.h
 
 fib : fib.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^
