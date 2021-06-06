@@ -36,6 +36,8 @@ size_t act_queue_len = 0;
  */
 ssm_time_t now;
 
+struct timespec system_time;
+
 /*** Internal helpers {{{ ***/
 
 static void schedule_act(struct act *act) {
@@ -190,7 +192,28 @@ void desensitize(struct trigger *trigger) {
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
 
-void initialize_ssm(ssm_time_t start) { now = start; }
+void initialize_ssm(ssm_time_t start) {
+  now = start;
+  // init_runtime(now)
+  clock_gettime(CLOCK_MONOTONIC, &system_time);
+}
+
+static inline void timespec_diff(struct timespec *a, struct timespec *b,
+                                 struct timespec *result) {
+  result->tv_sec  = a->tv_sec  - b->tv_sec;
+  result->tv_nsec = a->tv_nsec - b->tv_nsec;
+  if (result->tv_nsec < 0) {
+      result->tv_sec--;
+      result->tv_nsec += 1000000000L;
+  }
+}
+
+bool timespec_lt(struct timespec *a, struct timespec *b) {
+    if (a->tv_sec == b->tv_sec)
+        return a->tv_nsec < b->tv_nsec;
+    else
+        return a->tv_sec < b->tv_sec;
+}
 
 ssm_time_t tick() {
 #ifdef DEBUG
@@ -251,11 +274,25 @@ ssm_time_t tick() {
     time_t secs = (next - now) / 1000000;
     long ns = ((next - now) % 1000000) * 1000;
 
-    struct timespec dur = { secs, ns };
-    nanosleep(&dur, NULL);
+    struct timespec ssm_sleep_dur = { secs, ns };
+
+    struct timespec system_time_now;
+    clock_gettime(CLOCK_MONOTONIC, &system_time_now);
+
+    // get delta between last sleep
+    struct timespec delta;
+    timespec_diff(&system_time_now, &system_time, &delta);
+    // if delta > dur, dont sleep
+    if (timespec_lt(&delta, &ssm_sleep_dur)) {
+      struct timespec ssm_sleep_dur_adjusted;
+      timespec_diff(&ssm_sleep_dur, &delta, &ssm_sleep_dur_adjusted);
+      nanosleep(&ssm_sleep_dur_adjusted, NULL);
+    }
   }
 
   now = next;
+  clock_gettime(CLOCK_MONOTONIC, &system_time);
+
   return now;
 }
 
