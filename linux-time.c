@@ -21,11 +21,24 @@ static struct timespec system_time;
  */
 static inline void timespec_diff(struct timespec *a, struct timespec *b,
                                  struct timespec *result) {
-  result->tv_sec  = a->tv_sec  - b->tv_sec;
+  result->tv_sec  = a->tv_sec - b->tv_sec;
   result->tv_nsec = a->tv_nsec - b->tv_nsec;
   if (result->tv_nsec < 0) {
       result->tv_sec--;
       result->tv_nsec += 1000000000L;
+  }
+}
+
+/**
+ * Sum two time values.
+ */
+static inline void timespec_add(struct timespec *a, struct timespec *b,
+                                struct timespec *result) {
+  result->tv_sec  = a->tv_sec + b->tv_sec;
+  result->tv_nsec = a->tv_nsec + b->tv_nsec;
+  if (result->tv_nsec > 1000000000L) {
+      result->tv_sec++;
+      result->tv_nsec -= 1000000000L;
   }
 }
 
@@ -59,15 +72,15 @@ ssm_time_t timestep() {
 
     struct timespec ssm_sleep_dur = { secs, ns };
 
-    struct timespec system_time_now;
-    clock_gettime(CLOCK_MONOTONIC, &system_time_now);
+    struct timespec expected_system_time_next;
+    timespec_add(&system_time, &ssm_sleep_dur, &expected_system_time_next);
 
-    struct timespec delta;
-    timespec_diff(&system_time_now, &system_time, &delta);
+    clock_gettime(CLOCK_MONOTONIC, &system_time);
 
-    if (timespec_lt(&delta, &ssm_sleep_dur)) {
+    if (timespec_lt(&system_time, &expected_system_time_next)) {
       struct timespec ssm_sleep_dur_adjusted;
-      timespec_diff(&ssm_sleep_dur, &delta, &ssm_sleep_dur_adjusted);
+      timespec_diff(&expected_system_time_next, &system_time,
+                    &ssm_sleep_dur_adjusted);
       nanosleep(&ssm_sleep_dur_adjusted, NULL);
     }
   }
