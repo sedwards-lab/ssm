@@ -110,7 +110,7 @@ void step_clock(struct act *act) {
   switch (act->pc) {
   case 0:
     for (;;) { /* loop */
-      later_event(&a->timer, now + 100);
+      later_event(&a->timer, get_now() + 100);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -124,7 +124,7 @@ void step_clock(struct act *act) {
 
       PTR_ASSIGN(a->clk, act->priority, true);
 
-      later_event(&a->timer, now + 100);
+      later_event(&a->timer, get_now() + 100);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -360,7 +360,7 @@ int main(int argc, char *argv[]) {
 
   for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
        stop_at--, next = tick())
-    printf("next %lu\n", now);
+    printf("next %lu\n", get_now());
 
   return 0;
 }

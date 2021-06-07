@@ -117,12 +117,14 @@ void step_clk(struct act *act) {
 
   switch (act->pc) {
   case 0:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 1);
     act->pc = 1;
     return;
 
   case 1:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 0);
     act->pc = 0;
     return;
   }
@@ -334,7 +336,7 @@ int main(int argc, char *argv[]) {
 
   for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
        stop_at--, next = tick())
-    printf("next %lu\n", now);
+    printf("next %lu\n", get_now());
 
   return 0;
 }

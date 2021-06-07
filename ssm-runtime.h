@@ -31,4 +31,9 @@ extern void initialize_ssm(ssm_time_t);
  */
 extern ssm_time_t tick(void);
 
+extern const struct sv *peek_event_queue();
+
+extern ssm_time_t get_now();
+extern void set_now(ssm_time_t);
+
 #endif /* ifndef _SSM_RUNTIME_H */

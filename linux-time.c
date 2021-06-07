@@ -31,9 +31,11 @@ void initialize_time_driver() {
 }
 
 ssm_time_t timestep() {
-  ssm_time_t next = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                                        : NO_EVENT_SCHEDULED;
+  const struct sv *event_head = peek_event_queue();
+  ssm_time_t next = event_head ? event_head->later_time
+                               : NO_EVENT_SCHEDULED;
 
+  ssm_time_t now = get_now();
   if (next != NO_EVENT_SCHEDULED) {
     time_t secs = (next - now) / 1000000;
     long ns = ((next - now) % 1000000) * 1000;
@@ -54,7 +56,7 @@ ssm_time_t timestep() {
     }
   }
 
-  now = next;
+  set_now(next);
   clock_gettime(CLOCK_MONOTONIC, &system_time);
 
   return now;

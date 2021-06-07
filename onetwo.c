@@ -126,7 +126,7 @@ void step_main(struct act *act) {
   switch (act->pc) {
   case 0: {
     /* We could initialize a->a here, but no need */
-    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10);
+    a->a.sv.vtable->later(&a->a.sv, get_now() + TICKS_PER_SECOND, 10);
 
     depth_t new_depth = act->depth - 1; /* 2 children */
     priority_t new_priority = act->priority;

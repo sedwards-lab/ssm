@@ -3,8 +3,6 @@
  * events and abstract activation records.
  */
 
-#include <time.h>
-
 #include "ssm-act.h"
 #include "ssm-queue.h"
 #include "ssm-runtime.h"
@@ -20,8 +18,8 @@
  *
  * Managed as a binary heap sorted by e->later_time, implemented in ssm-queue.c.
  */
-struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
-size_t event_queue_len = 0;
+static struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
+static size_t event_queue_len = 0;
 
 /**
  * Activation record queue, used to track and schedule continuations at each
@@ -36,7 +34,7 @@ size_t act_queue_len = 0;
  * Note that this starts out uninitialized. It is the responsibility of the
  * runtime to do so.
  */
-ssm_time_t now;
+static ssm_time_t now;
 
 /*** Internal helpers {{{ ***/
 
@@ -196,6 +194,14 @@ void initialize_ssm(ssm_time_t start) {
   now = start;
   initialize_time_driver();
 }
+
+const struct sv *peek_event_queue() {
+  return event_queue_len > 0 ? event_queue[QUEUE_HEAD] : NULL;
+}
+
+ssm_time_t get_now() { return now; }
+
+void set_now(ssm_time_t n) { now = n; }
 
 ssm_time_t tick() {
 #ifdef DEBUG

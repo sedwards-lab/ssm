@@ -107,7 +107,7 @@ void step_sum(struct act *act) {
     return;
   }
   case 1:
-    PTR_LATER(a->r, now + TICKS_PER_SECOND, *DEREF(int, a->r1) + *DEREF(int, a->r2));
+    PTR_LATER(a->r, get_now() + TICKS_PER_SECOND, *DEREF(int, a->r1) + *DEREF(int, a->r2));
     act_leave(act, sizeof(act_sum_t));
     return;
   }
@@ -134,7 +134,7 @@ void step_fib(struct act *act) {
     a->r1.value = 0;
     a->r2.value = 0;
     if (a->n < 2) {
-      PTR_LATER(a->r, now + TICKS_PER_SECOND, 1);
+      PTR_LATER(a->r, get_now() + TICKS_PER_SECOND, 1);
       act_leave(act, sizeof(act_fib_t));
       return;
     }
@@ -177,7 +177,7 @@ int main(int argc, char *argv[]) {
 
   initialize_ssm(0);
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("now %lu\n", next);
+    printf("get_now() %lu\n", next);
 
   printf("%d\n", result.value);
   return 0;

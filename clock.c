@@ -73,7 +73,7 @@ void step_second_clock(struct act *act) {
       assign_event(a->second_event.ptr, act->priority); /* seconds = Event */
 
       /* after 1s timer = Event */
-      later_event(&a->timer, now + 1 * TICKS_PER_SECOND);
+      later_event(&a->timer, get_now() + 1 * TICKS_PER_SECOND);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -195,7 +195,7 @@ int main(int argc, char *argv[]) {
 
   for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
        stop_at--, next = tick())
-    printf("next %lu\n", now);
+    printf("next %lu\n", get_now());
 
   return 0;
 }
