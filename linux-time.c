@@ -1,11 +1,24 @@
+/**
+ * Implementation of a linux time driver, which uses nanosleep to progress time
+ * between events.
+ */
+
 #include <time.h>
 
 #include "ssm-queue.h"
 #include "ssm-sv.h"
 #include "ssm-runtime.h"
 
+/**
+ * Timestamp of the last tick in the runtime.
+ */
 static struct timespec system_time;
 
+/*** Timespec helpers {{{ ***/
+
+/**
+ * Calculate the delta between two timestamps.
+ */
 static inline void timespec_diff(struct timespec *a, struct timespec *b,
                                  struct timespec *result) {
   result->tv_sec  = a->tv_sec  - b->tv_sec;
@@ -16,12 +29,19 @@ static inline void timespec_diff(struct timespec *a, struct timespec *b,
   }
 }
 
+/**
+ * Determine whether one timestamp's value is less than another's.
+ */
 static inline bool timespec_lt(struct timespec *a, struct timespec *b) {
     if (a->tv_sec == b->tv_sec)
         return a->tv_nsec < b->tv_nsec;
     else
         return a->tv_sec < b->tv_sec;
 }
+
+/*** Timespec helpers }}} ***/
+
+/*** Time driver API, exposed via time-driver.h {{{ ***/
 
 void initialize_time_driver() {
   clock_gettime(CLOCK_MONOTONIC, &system_time);
@@ -42,10 +62,9 @@ ssm_time_t timestep() {
     struct timespec system_time_now;
     clock_gettime(CLOCK_MONOTONIC, &system_time_now);
 
-    // get delta between last sleep
     struct timespec delta;
     timespec_diff(&system_time_now, &system_time, &delta);
-    // if delta > dur, dont sleep
+
     if (timespec_lt(&delta, &ssm_sleep_dur)) {
       struct timespec ssm_sleep_dur_adjusted;
       timespec_diff(&ssm_sleep_dur, &delta, &ssm_sleep_dur_adjusted);
@@ -58,3 +77,5 @@ ssm_time_t timestep() {
 
   return next;
 }
+
+/*** Time driver API, exposed via time-driver.h }}} ***/

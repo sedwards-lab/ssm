@@ -31,8 +31,14 @@ extern void initialize_ssm(ssm_time_t);
  */
 extern ssm_time_t tick(void);
 
+/**
+ * Retrieve the head of the queue
+ */
 extern const struct sv *peek_event_queue();
 
+/**
+ * Getter and setter for ssm's time variable
+ */
 extern ssm_time_t get_now();
 extern void set_now(ssm_time_t);
 
