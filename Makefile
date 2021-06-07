@@ -1,14 +1,17 @@
 CC = gcc
 CFLAGS = -g -Wall -pedantic # -DDEBUG
 
+TIME_DRIVER ?= simulation
+
 EXE = fib fib2 fib3 counter counter2 clock onetwo
 obj_EXE = $(foreach e, $(EXE), $(e).o)
 
-SSMLIB = ssm-types ssm-queue ssm-sched linux-time
+SSMLIB = ssm-types ssm-queue ssm-sched $(TIME_DRIVER)-time
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
 
 TESTS = ssm-queue-test
 obj_TESTS = $(foreach e, $(TESTS), $(e).o)
+
 
 .PHONY: default tests all clean
 default: $(EXE)

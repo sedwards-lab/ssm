@@ -6,9 +6,6 @@
 
 static struct timespec system_time;
 
-extern struct sv *event_queue[];
-extern size_t event_queue_len;
-
 static inline void timespec_diff(struct timespec *a, struct timespec *b,
                                  struct timespec *result) {
   result->tv_sec  = a->tv_sec  - b->tv_sec;
@@ -59,5 +56,5 @@ ssm_time_t timestep() {
   set_now(next);
   clock_gettime(CLOCK_MONOTONIC, &system_time);
 
-  return now;
+  return next;
 }
