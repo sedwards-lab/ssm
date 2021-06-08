@@ -139,7 +139,9 @@ void dequeue_event(sv_t *var) {
 
   sv_t* to_insert = event_queue[event_queue_len--];
   event_queue_index_t parent = i >> 1;
-  if(to_insert->event_time > event_queue[parent]->event_time) {
+  if (parent == 0) {
+    event_queue[1] = to_insert;
+  } else if(to_insert->event_time > event_queue[parent]->event_time) {
     sift_down(i, to_insert);
   } else {
     sift_up(i, to_insert);
