@@ -35,9 +35,7 @@ sv_t *event_queue[EVENT_QUEUE_SIZE+1];
 
 /** Only used for debugging */
 int can_schedule(sv_t *var) {
-  if(var->event_time == NO_EVENT_SCHEDULED) {
-    return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
-  }
+  return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
 }
 void sensitize(sv_t *var, trigger_t *trigger)
 {
