@@ -35,8 +35,14 @@ sv_t *event_queue[EVENT_QUEUE_SIZE+1];
 
 /** Only used for debugging */
 int can_schedule(sv_t *var) {
-  return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
+  if (var->event_time != NO_EVENT_SCHEDULED)
+    /* If an event is already scheduled, we can always reschedule it */
+    return true;
+  else
+    /* Otherwise, we need to see if the event queue has room for it */
+    return event_queue_len + 1 <= EVENT_QUEUE_SIZE;
 }
+
 void sensitize(sv_t *var, trigger_t *trigger)
 {
   assert(var);
