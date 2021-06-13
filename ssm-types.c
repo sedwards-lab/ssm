@@ -2,9 +2,11 @@
  * Implementations of type-specific scheduled variables, whose vtable methods
  * are aware of the size and layout of their respective payloads.
  */
+#include <unistd.h>
 
 #include "ssm-types.h"
 #include "ssm-queue.h" /* For managing inner queues */
+#include "ssm-runtime.h" /* For accessing current time */
 
 const struct svtable *unit_vtable = NULL;
 
@@ -52,3 +54,36 @@ DEFINE_SCHED_VARIABLE_SCALAR(u8);
 DEFINE_SCHED_VARIABLE_SCALAR(u16);
 DEFINE_SCHED_VARIABLE_SCALAR(u32);
 DEFINE_SCHED_VARIABLE_SCALAR(u64);
+
+
+static void update_io_read(struct sv *sv) {
+  io_read_svt *v = container_of(sv, io_read_svt, sv);
+  if (sv->later_time == get_now()) // Didn't read in time, use default value.
+    v->value = v->later_value;
+  else // Detected value sooner, read from fd.
+    read(v->fd, &v->value, 1);
+}
+static void assign_io_read(struct sv *sv, priority_t prio,
+                               const any_t value) {
+  io_read_svt *v = container_of(sv, io_read_svt, sv);
+  v->value = (u8) value;
+  assign_event(sv, prio);
+}
+static void later_io_read(struct sv *sv, ssm_time_t timeout,
+                              const any_t default_value) {
+  io_read_svt *v = container_of(sv, io_read_svt, sv);
+  v->later_value = (u8) default_value;
+  later_event(sv, timeout);
+}
+static const struct payload_info io_read_payload_info[1] = {{
+    .offset = offsetof(io_read_svt, value),
+    .later_offset = offsetof(io_read_svt, later_value),
+}};
+const struct svtable io_read_vtable = {
+    .update = update_io_read,
+    .assign = assign_io_read,
+    .later = later_io_read,
+    .payload_info = io_read_payload_info,
+    .type_name = "io_read (u8)",
+};
+
