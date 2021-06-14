@@ -2,6 +2,7 @@
 #define __TIME_DRIVER_H
 
 #include "ssm-queue.h"
+#include "ssm-runtime.h"
 
 /**
  * This header file should be implemented by an implementation of a time

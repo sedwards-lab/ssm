@@ -55,13 +55,35 @@ DEFINE_SCHED_VARIABLE_SCALAR(u16);
 DEFINE_SCHED_VARIABLE_SCALAR(u32);
 DEFINE_SCHED_VARIABLE_SCALAR(u64);
 
+void add_io_event(struct sv *sv) {
+  io_read_svt *v = container_of(sv, io_read_svt, sv);
+  v->next = io_events;
+  if (io_events)
+    io_events->prev_ptr = &v->next;
+
+  io_events = v;
+
+  v->prev_ptr = &io_events;
+}
+void remove_io_event(struct sv *sv) {
+  io_read_svt *v = container_of(sv, io_read_svt, sv);
+
+  *v->prev_ptr = v->next;
+
+  if (v->next)
+    v->next->prev_ptr = v->prev_ptr;
+}
 
 static void update_io_read(struct sv *sv) {
   io_read_svt *v = container_of(sv, io_read_svt, sv);
-  if (sv->later_time == get_now()) // Didn't read in time, use default value.
+  if (v->timeout_time == get_now()) // Didn't read in time, use default value.
     v->value = v->later_value;
-  else // Detected value sooner, read from fd.
+  else { // Detected value sooner, read from fd.
+    printf("here\n");
     read(v->fd, &v->value, 1);
+  }
+
+  remove_io_event(sv);
 }
 static void assign_io_read(struct sv *sv, priority_t prio,
                                const any_t value) {
@@ -73,6 +95,8 @@ static void later_io_read(struct sv *sv, ssm_time_t timeout,
                               const any_t default_value) {
   io_read_svt *v = container_of(sv, io_read_svt, sv);
   v->later_value = (u8) default_value;
+  v->timeout_time = timeout;
+  add_io_event(sv);
   later_event(sv, timeout);
 }
 static const struct payload_info io_read_payload_info[1] = {{

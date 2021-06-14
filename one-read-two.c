@@ -17,6 +17,7 @@
  */
 
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 
 #include "ssm-act.h"
@@ -117,6 +118,9 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
   DEBUG_SV_NAME(&a->a.sv, "a");
 
   a->a.sv.var_name = "a";
+  a->a.fd = STDIN_FILENO;
+  a->a.next = NULL;
+  a->a.prev_ptr = NULL;
 
   return act;
 }
@@ -142,7 +146,7 @@ void step_main(struct act *act) {
     return;
   }
   case 1:
-    printf("a = %d\n", a->a.value);
+    printf("a = %u\n", a->a.value);
     act_leave(act, sizeof(act_main_t));
     return;
   }

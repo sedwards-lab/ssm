@@ -36,6 +36,8 @@ size_t act_queue_len = 0;
  */
 static ssm_time_t now;
 
+io_read_svt *io_events = NULL;
+
 /*** Internal helpers {{{ ***/
 
 static void schedule_act(struct act *act) {
@@ -135,9 +137,11 @@ void later_event(struct sv *sv, ssm_time_t then) {
     /* This event isn't already scheduled, so add it to the event queue. */
     sv->later_time = then;
     enqueue_event(event_queue, &event_queue_len, sv);
+    /* printf("here %d\n", event_queue_len); */
   } else {
     /* This event is already scheduled, so we need to reschedule it. */
     idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
+    /* printf("%ld <= %ld\n", QUEUE_HEAD, idx); */
     assert(QUEUE_HEAD <= idx);
     sv->later_time = then;
     requeue_event(event_queue, &event_queue_len, idx);

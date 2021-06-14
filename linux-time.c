@@ -4,6 +4,7 @@
  */
 
 #include <time.h>
+#include <sys/select.h>
 
 #include "ssm-queue.h"
 #include "ssm-sv.h"
@@ -64,6 +65,14 @@ ssm_time_t timestep() {
   const struct sv *event_head = peek_event_queue();
   ssm_time_t next = event_head ? event_head->later_time
                                : NO_EVENT_SCHEDULED;
+  fd_set read_fds;
+  FD_ZERO(&read_fds);
+  int max_fd = -1;
+  for (io_read_svt *io_sv = io_events; io_sv; io_sv = io_sv->next) {
+    FD_SET(io_sv->fd, &read_fds);
+    if (io_sv->fd > max_fd)
+      max_fd = io_sv->fd;
+  }
 
   ssm_time_t now = get_now();
   if (next != NO_EVENT_SCHEDULED) {
@@ -81,7 +90,31 @@ ssm_time_t timestep() {
       struct timespec ssm_sleep_dur_adjusted;
       timespec_diff(&expected_system_time_next, &system_time,
                     &ssm_sleep_dur_adjusted);
-      nanosleep(&ssm_sleep_dur_adjusted, NULL);
+
+      if (io_events) {
+        int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, &ssm_sleep_dur_adjusted, NULL);
+        if (ret < 0) {
+          // err, but lets ignore for now
+        } else if (ret == 0) {
+          // timeout, which means this was just a nonosleep
+        } else {
+          clock_gettime(CLOCK_MONOTONIC, &system_time);
+          struct timespec blocked_time;
+          timespec_diff(&expected_system_time_next, &system_time, &blocked_time);
+          ssm_time_t time_now = next - (blocked_time.tv_sec * 1000000) - (blocked_time.tv_nsec / 1000);
+          for (io_read_svt *io_sv = io_events; io_sv; io_sv = io_sv->next) {
+            if(FD_ISSET(io_sv->fd, &read_fds)) {
+              // enqueue event
+              later_event(&io_sv->sv, time_now);
+            }
+          }
+
+          set_now(time_now);
+          return time_now;
+        }
+      } else {
+        nanosleep(&ssm_sleep_dur_adjusted, NULL);
+      }
     }
   }
 

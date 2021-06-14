@@ -18,6 +18,8 @@
  */
 #include "ssm-core.h"
 
+#include "ssm-types.h"
+
 /**
  * Initialize the runtime system to start at some time, which is when tick
  * should next be called.
@@ -41,5 +43,7 @@ extern const struct sv *peek_event_queue();
  */
 extern ssm_time_t get_now();
 extern void set_now(ssm_time_t);
+
+extern io_read_svt *io_events;
 
 #endif /* ifndef _SSM_RUNTIME_H */

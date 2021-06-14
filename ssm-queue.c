@@ -145,7 +145,8 @@ void requeue_event(struct sv **event_queue, size_t *queue_len,
 
 idx_t index_of_event(struct sv **event_queue, size_t *queue_len,
                      struct sv *to_find) {
-  for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
+  /* printf("queue len%ld\n", *queue_len); */
+  for (idx_t idx = QUEUE_HEAD; idx <= *queue_len; idx++)
     if (event_queue[idx] == to_find)
       return idx;
   return 0;
