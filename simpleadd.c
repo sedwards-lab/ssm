@@ -1,11 +1,11 @@
-#include <stdio.h>
-#include <stdlib.h>
 #include "ssm-act.h"
+#include "ssm-debug.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
-#include "ssm-debug.h"
+#include <stdio.h>
+#include <stdlib.h>
 
-/* 
+/*
 add &c &a &b
   wait a
   wait b
@@ -22,10 +22,10 @@ main
  */
 
 typedef struct {
-  
+
   struct act act;
 
-  ptr_i32_svt c;      // Where we should write our result
+  ptr_i32_svt c; // Where we should write our result
   ptr_i32_svt a;
   ptr_i32_svt b;
 
@@ -35,7 +35,7 @@ typedef struct {
 
 typedef struct {
   struct act act;
-  
+
   i32_svt a;
   i32_svt b;
   i32_svt c;
@@ -44,67 +44,60 @@ typedef struct {
 
 stepf_t step_add;
 
-struct act *enter_add(struct act *cont, priority_t priority,
-		     depth_t depth, ptr_i32_svt a, ptr_i32_svt b, ptr_i32_svt c)
-{
-  
+struct act *enter_add(struct act *cont, priority_t priority, depth_t depth,
+                      ptr_i32_svt a, ptr_i32_svt b, ptr_i32_svt c) {
+
   struct act *act =
-    act_enter(sizeof(act_add_t), step_add, cont, priority, depth);
-  
+      act_enter(sizeof(act_add_t), step_add, cont, priority, depth);
+
   DEBUG_ACT_NAME(act, "add");
 
   act_add_t *ac = container_of(act, act_add_t, act);
-  
+
   // copy the value from the arguments
   ac->c = c;
   ac->b = b;
   ac->a = a;
 
   return act;
-
 }
 
-void step_add(struct act *act)  
-{
+void step_add(struct act *act) {
   act_add_t *a = container_of(act, act_add_t, act);
-  
+
   switch (act->pc) {
-  
+
   case 0:
     a->trigger1.act = act;
 
     sensitize(a->a.ptr, &a->trigger1);
     act->pc = 1;
     return;
-  
+
   case 1:
-    desensitize(&a->trigger1); 
+    desensitize(&a->trigger1);
 
     // wait for b
     a->trigger2.act = act;
     sensitize(a->b.ptr, &a->trigger2);
     act->pc = 2;
     return;
-  
+
   case 2:
-    desensitize(&a->trigger2); 
+    desensitize(&a->trigger2);
 
     // write to c
     PTR_ASSIGN(a->c, act->priority, *DEREF(int, a->a) + *DEREF(int, a->b));
     act_leave(act, sizeof(act_add_t));
     return;
-  
   }
-
 }
 
 stepf_t step_main;
 
-struct act *enter_main(struct act *cont, priority_t priority,
-		     depth_t depth)
-{
+struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
   struct act *act =
-    act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
+      act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
 
   DEBUG_ACT_NAME(act, "main");
 
@@ -121,12 +114,11 @@ struct act *enter_main(struct act *cont, priority_t priority,
   return act;
 }
 
-void step_main(struct act *act)  
-{
-  
+void step_main(struct act *act) {
+
   act_main_t *a = container_of(act, act_main_t, act);
 
-  switch (act->pc) {    
+  switch (act->pc) {
   case 0:
     a->a.value = 1;
     a->b.value = 1;
@@ -136,25 +128,23 @@ void step_main(struct act *act)
     // after 2s b = 10
     a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10);
     a->b.sv.vtable->later(&a->b.sv, now + 2 * TICKS_PER_SECOND, 10);
-    
-    act_call(enter_add(act, act->priority, act->depth, 
-      PTR_OF_SV(a->a.sv), PTR_OF_SV(a->b.sv), PTR_OF_SV(a->c.sv)));
+
+    act_call(enter_add(act, act->priority, act->depth, PTR_OF_SV(a->a.sv),
+                       PTR_OF_SV(a->b.sv), PTR_OF_SV(a->c.sv)));
 
     act->pc = 1;
     return;
-  
+
   case 1:
     printf("c = %d\n", a->c.value);
     act_leave(act, sizeof(act_main_t));
     return;
-
   }
 }
 
 void top_return(struct act *cont) { return; }
 
-int main()
-{  
+int main() {
   initialize_ssm(0);
 
   struct act top = {.step = top_return};
@@ -164,6 +154,6 @@ int main()
 
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
     printf("tick: next = %lu\n", next);
-  
+
   return 0;
 }
