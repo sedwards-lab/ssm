@@ -44,7 +44,7 @@ typedef struct {
 
 stepf_t step_add;
 
-act_add_t *enter_add(struct act *cont, priority_t priority,
+struct act *enter_add(struct act *cont, priority_t priority,
 		     depth_t depth, ptr_i32_svt a, ptr_i32_svt b, ptr_i32_svt c)
 {
   
@@ -100,7 +100,7 @@ void step_add(struct act *act)
 
 stepf_t step_main;
 
-act_main_t *enter_main(struct act *cont, priority_t priority,
+struct act *enter_main(struct act *cont, priority_t priority,
 		     depth_t depth)
 {
   struct act *act =
