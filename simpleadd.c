@@ -163,7 +163,7 @@ int main()
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("tick: next = %llu\n", next);
+    printf("tick: next = %lu\n", next);
   
   return 0;
 }
