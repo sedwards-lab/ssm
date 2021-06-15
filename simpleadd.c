@@ -84,7 +84,6 @@ void step_add(struct act *act)
     a->trigger2.act = act;
     sensitize(a->b.ptr, &a->trigger2);
     act->pc = 2;
-  
     return;
   
   case 2:
@@ -92,14 +91,11 @@ void step_add(struct act *act)
 
     // write to c
     PTR_ASSIGN(a->c, act->priority, *DEREF(int, a->a) + *DEREF(int, a->b));
-    act->pc = 3;
+    act_leave(act, sizeof(act_add_t));
     return;
   
-  case 3:
-    ;
   }
 
-  act_leave(act, sizeof(act_add_t));
 }
 
 stepf_t step_main;
@@ -117,6 +113,10 @@ act_main_t *enter_main(struct act *cont, priority_t priority,
   initialize_event(&a->a.sv, &i32_vtable);
   initialize_event(&a->b.sv, &i32_vtable);
   initialize_event(&a->c.sv, &i32_vtable);
+
+  DEBUG_SV_NAME(&a->a.sv, "a");
+  DEBUG_SV_NAME(&a->b.sv, "a");
+  DEBUG_SV_NAME(&a->c.sv, "a");
 
   return act;
 }
@@ -163,7 +163,7 @@ int main()
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("tick: next = %lu\n", next);
+    printf("tick: next = %llu\n", next);
   
   return 0;
 }
