@@ -1,3 +1,8 @@
+/**
+ * Implementation of SSM's IO interface -- a doubly linked list representing
+ * the system's file descriptor table.
+ */
+
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>

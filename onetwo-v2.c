@@ -1,5 +1,5 @@
 /**
- * onetwo example from paper:
+ * modified onetwo example from paper, for linux io:
  *
  *   one &a
  *     wait a
