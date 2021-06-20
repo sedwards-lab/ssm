@@ -1,9 +1,6 @@
 #ifndef __TIME_DRIVER_H
 #define __TIME_DRIVER_H
 
-#include "ssm-queue.h"
-#include "ssm-runtime.h"
-
 /**
  * This header file should be implemented by an implementation of a time
  * driver, which is responsible for progressing time in the ssm runtime.

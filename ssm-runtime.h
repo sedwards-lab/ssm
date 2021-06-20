@@ -18,7 +18,6 @@
  */
 #include "ssm-core.h"
 #include "ssm-io.h"
-#include "ssm-types.h"
 
 /**
  * Initialize the runtime system to start at some time, which is when tick
@@ -43,5 +42,10 @@ extern const struct sv *peek_event_queue();
  */
 extern ssm_time_t get_now();
 extern void set_now(ssm_time_t);
+
+/**
+ * File descriptor table, used for blocking between scheduled events.
+ */
+extern struct io_read_svt *io_vars;
 
 #endif /* ifndef _SSM_RUNTIME_H */

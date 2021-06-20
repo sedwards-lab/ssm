@@ -36,4 +36,4 @@ struct sv *get_stdin_var();
  */
 void close_io_var(struct io_read_svt *v);
 
-#endif /* _SSM_IO_H */
+#endif /* ifndef _SSM_IO_H */

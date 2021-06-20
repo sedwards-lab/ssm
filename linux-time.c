@@ -11,6 +11,7 @@
 #include "ssm-queue.h"
 #include "ssm-sv.h"
 #include "ssm-runtime.h"
+#include "time-driver.h"
 
 /**
  * Timestamp of the last tick in the runtime.
@@ -89,7 +90,7 @@ ssm_time_t timestep() {
 
     clock_gettime(CLOCK_MONOTONIC, &system_time);
 
-    bool running_behind = timespec_lt(&system_time, &expected_system_time_next);
+    bool running_behind = !timespec_lt(&system_time, &expected_system_time_next);
     struct timespec instant_timeout = {0 , 0};
 
     struct timespec ssm_sleep_dur_adjusted;
