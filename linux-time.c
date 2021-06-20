@@ -3,6 +3,8 @@
  * between events.
  */
 
+#include <stdio.h>
+#include <unistd.h>
 #include <time.h>
 #include <sys/select.h>
 
@@ -68,7 +70,8 @@ ssm_time_t timestep() {
   fd_set read_fds;
   FD_ZERO(&read_fds);
   int max_fd = -1;
-  for (io_read_svt *io_sv = io_events; io_sv; io_sv = io_sv->next) {
+  for (struct io_read_svt *io_sv = io_vars; io_sv; io_sv = io_sv->next) {
+    if (!io_sv->u8_sv.sv.triggers) continue; // Skip if no one is waiting
     FD_SET(io_sv->fd, &read_fds);
     if (io_sv->fd > max_fd)
       max_fd = io_sv->fd;
@@ -86,34 +89,61 @@ ssm_time_t timestep() {
 
     clock_gettime(CLOCK_MONOTONIC, &system_time);
 
-    if (timespec_lt(&system_time, &expected_system_time_next)) {
-      struct timespec ssm_sleep_dur_adjusted;
-      timespec_diff(&expected_system_time_next, &system_time,
-                    &ssm_sleep_dur_adjusted);
+    bool running_behind = timespec_lt(&system_time, &expected_system_time_next);
+    struct timespec instant_timeout = {0 , 0};
 
-      if (io_events) {
-        int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, &ssm_sleep_dur_adjusted, NULL);
-        if (ret < 0) {
-          // err, but lets ignore for now
-        } else if (ret == 0) {
-          // timeout, which means this was just a nonosleep
-        } else {
-          clock_gettime(CLOCK_MONOTONIC, &system_time);
-          struct timespec blocked_time;
-          timespec_diff(&expected_system_time_next, &system_time, &blocked_time);
-          ssm_time_t time_now = next - (blocked_time.tv_sec * 1000000) - (blocked_time.tv_nsec / 1000);
-          for (io_read_svt *io_sv = io_events; io_sv; io_sv = io_sv->next) {
-            if(FD_ISSET(io_sv->fd, &read_fds)) {
-              // enqueue event
-              later_event(&io_sv->sv, time_now);
-            }
-          }
+    struct timespec ssm_sleep_dur_adjusted;
+    timespec_diff(&expected_system_time_next, &system_time,
+                  &ssm_sleep_dur_adjusted);
 
-          set_now(time_now);
-          return time_now;
-        }
-      } else {
+    if (max_fd == -1) {
+      // No fds to block on
+      if (!running_behind)
         nanosleep(&ssm_sleep_dur_adjusted, NULL);
+    } else {
+      // Block on fds
+      struct timespec *timeout = (running_behind ? &instant_timeout
+                                                 : &ssm_sleep_dur_adjusted);
+      int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, timeout, NULL);
+      if (ret < 0) {
+        perror("pselect");
+        exit(1);
+      } else if (ret) {
+        // Calculate current time and enqueue events for ready fds
+        clock_gettime(CLOCK_MONOTONIC, &system_time);
+        struct timespec remaining_sleep_time;
+        timespec_diff(&expected_system_time_next, &system_time, &remaining_sleep_time);
+        next -= ((remaining_sleep_time.tv_sec * 1000000)
+                 + (remaining_sleep_time.tv_nsec / 1000)); 
+        for (struct io_read_svt *io_sv = io_vars; io_sv; io_sv = io_sv->next) {
+          if(io_sv->u8_sv.sv.triggers && FD_ISSET(io_sv->fd, &read_fds)) {
+            read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
+            later_event(&io_sv->u8_sv.sv, next);
+          }
+        }
+      }
+    }
+  } else {
+    // No events scheduled, but check if any io to block on
+    if (max_fd != -1) {
+      int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, NULL, NULL);
+      if (ret < 0) {
+          perror("pselect");
+          exit(1);
+      }
+
+      // Calculate current time and enqueue events for ready fds
+      struct timespec old_system_time = system_time;
+      clock_gettime(CLOCK_MONOTONIC, &system_time);
+      struct timespec delta_last_tick;
+      timespec_diff(&system_time, &old_system_time, &delta_last_tick);
+      next = (now + (delta_last_tick.tv_sec * 1000000)
+              + (delta_last_tick.tv_nsec / 1000));
+      for (struct io_read_svt *io_sv = io_vars; io_sv; io_sv = io_sv->next) {
+        if(io_sv->u8_sv.sv.triggers && FD_ISSET(io_sv->fd, &read_fds)) {
+          read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
+          later_event(&io_sv->u8_sv.sv, next);
+        }
       }
     }
   }

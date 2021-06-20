@@ -86,22 +86,6 @@ DECLARE_SCHED_VARIABLE_SCALAR(u64);
 
 /* Scalar types }}} */
 
-struct io_read_svt {
-  struct sv sv;
-  int fd;
-  u8 value;
-  u8 later_value;
-
-  ssm_time_t timeout_time;
-
-  struct io_read_svt *next;
-  struct io_read_svt **prev_ptr;
-};
-
-typedef struct io_read_svt io_read_svt;
-extern const struct svtable io_read_vtable;
-typedef struct svt_ptr ptr_io_read_svt;
-
 #endif /* _SSM_TYPES_H */
 
 /* vim: set ts=2 sw=2 tw=80 et foldmethod=marker :*/

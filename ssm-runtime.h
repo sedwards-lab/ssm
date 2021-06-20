@@ -17,7 +17,7 @@
  * Used by the runtime to control execution of a program.
  */
 #include "ssm-core.h"
-
+#include "ssm-io.h"
 #include "ssm-types.h"
 
 /**
@@ -43,7 +43,5 @@ extern const struct sv *peek_event_queue();
  */
 extern ssm_time_t get_now();
 extern void set_now(ssm_time_t);
-
-extern io_read_svt *io_events;
 
 #endif /* ifndef _SSM_RUNTIME_H */

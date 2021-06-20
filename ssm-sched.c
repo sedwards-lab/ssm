@@ -36,8 +36,6 @@ size_t act_queue_len = 0;
  */
 static ssm_time_t now;
 
-io_read_svt *io_events = NULL;
-
 /*** Internal helpers {{{ ***/
 
 static void schedule_act(struct act *act) {

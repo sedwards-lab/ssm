@@ -3,10 +3,10 @@ CFLAGS = -g -Wall -pedantic # -DDEBUG
 
 TIME_DRIVER ?= simulation
 
-EXE = fib fib2 fib3 counter counter2 clock onetwo one-read-two
+EXE = fib fib2 fib3 counter counter2 clock onetwo onetwo-v2
 obj_EXE = $(foreach e, $(EXE), $(e).o)
 
-SSMLIB = ssm-types ssm-queue ssm-sched $(TIME_DRIVER)-time
+SSMLIB = ssm-types ssm-io ssm-queue ssm-sched $(TIME_DRIVER)-time
 obj_SSMLIB = $(foreach e, $(SSMLIB), $(e).o)
 
 TESTS = ssm-queue-test
@@ -44,6 +44,9 @@ clock : clock.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
 onetwo : onetwo.o $(obj_SSMLIB)
+	$(CC) $(CFLAGS) -o $@ $^
+
+onetwo-v2 : onetwo-v2.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^
 
 one-read-two : one-read-two.o $(obj_SSMLIB)
