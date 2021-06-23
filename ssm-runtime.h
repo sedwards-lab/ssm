@@ -46,6 +46,6 @@ extern void set_now(ssm_time_t);
 /**
  * File descriptor table, used for blocking between scheduled events.
  */
-extern struct io_read_svt *io_vars;
+extern struct io_read_svt io_vars[MAX_IO_VARS];
 
 #endif /* ifndef _SSM_RUNTIME_H */

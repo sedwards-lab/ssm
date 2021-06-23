@@ -10,45 +10,44 @@
 
 #include "ssm-io.h"
 
-struct io_read_svt *open_io_var(const char *file_name) {
-  struct io_read_svt *v = malloc(sizeof(struct io_read_svt));
-  assert(v);
-  initialize_event(&v->u8_sv.sv, &u8_vtable);
-  if (!strcmp(file_name, "stdin")) {
-    DEBUG_SV_NAME(&v->u8_sv.sv, "stdin");
-    v->file_name = v->u8_sv.sv.var_name = "stdin";
-    v->fd = STDIN_FILENO;
-  } else {
-    v->fd = open(file_name, O_RDONLY);
-    assert(v->fd != -1);
+void initialize_io() {
+  // Initialize stdin
+  struct io_read_svt *stdin_v = &io_vars[0];
+  initialize_event(&stdin_v->u8_sv.sv, &u8_vtable);
+  stdin_v->fd = STDIN_FILENO;
+  stdin_v->file_name = "stdio";
+  stdin_v->is_open = true;
+}
+
+void deinitialize_io() {
+  for (int i = 0; i < MAX_IO_VARS; i++) {
+    if (io_vars[i].is_open) {
+      close(io_vars[i].fd);
+      io_vars[i].file_name = "";
+      io_vars[i].is_open = false;
+    }
   }
+}
 
-  v->next = io_vars;
-  if (io_vars)
-    io_vars->prev_ptr = &v->next;
+struct io_read_svt *open_io_var(const char *file_name) {
+  int fd = open(file_name, O_RDONLY);
+  assert(fd != -1);
+  struct io_read_svt *v = io_vars + fd;
 
-  io_vars = v;
-
-  v->prev_ptr = &io_vars;
+  initialize_event(&v->u8_sv.sv, &u8_vtable);
+  v->fd = fd;
+  v->file_name = file_name;
+  v->is_open = true;
 
   return v;
 }
 
 struct sv *get_stdin_var() {
-  for (struct io_read_svt *io_sv = io_vars; io_sv; io_sv = io_sv->next) {
-    if (!strcmp(io_sv->file_name, "stdin"))
-      return &io_sv->u8_sv.sv;
-  }
-
-  return NULL;
+  return &io_vars[0].u8_sv.sv;
 }
 
 void close_io_var(struct io_read_svt *v) {
-  *v->prev_ptr = v->next;
-
-  if (v->next)
-    v->next->prev_ptr = v->prev_ptr;
-
+  v->is_open = false;
+  v->file_name = "";
   close(v->fd);
-  free(v);
 }

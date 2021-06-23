@@ -12,14 +12,17 @@ struct io_read_svt {
 
   int fd;
   const char *file_name;
-  struct io_read_svt *next;
-  struct io_read_svt **prev_ptr;
+  bool is_open;
 };
 
 /* Doubly linked list of all open files in the program -- our representation of
  * the file descriptor table.
  */
-struct io_read_svt *io_vars;
+#define MAX_IO_VARS 256
+struct io_read_svt io_vars[MAX_IO_VARS];
+
+void initialize_io();
+void deinitialize_io();
 
 /*
  * Open a file and return an io_read_svt.

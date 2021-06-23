@@ -8,7 +8,7 @@
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
 
-#include "time-driver.h"
+#include "time-driver.h" // Remove this
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
@@ -135,11 +135,9 @@ void later_event(struct sv *sv, ssm_time_t then) {
     /* This event isn't already scheduled, so add it to the event queue. */
     sv->later_time = then;
     enqueue_event(event_queue, &event_queue_len, sv);
-    /* printf("here %d\n", event_queue_len); */
   } else {
     /* This event is already scheduled, so we need to reschedule it. */
     idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
-    /* printf("%ld <= %ld\n", QUEUE_HEAD, idx); */
     assert(QUEUE_HEAD <= idx);
     sv->later_time = then;
     requeue_event(event_queue, &event_queue_len, idx);
@@ -194,7 +192,7 @@ void desensitize(struct trigger *trigger) {
 
 void initialize_ssm(ssm_time_t start) {
   now = start;
-  initialize_time_driver();
+  initialize_time_driver(); // Let caller do this
 }
 
 const struct sv *peek_event_queue() {
@@ -252,12 +250,7 @@ ssm_time_t tick() {
     to_run->step(to_run);
   }
 
-  /*
-   * FIXME: this interface isn't really usable. We want the runtime driver to be
-   * able to interrupt sooner than now, so that it can respond to I/O etc.
-   */
-
-  return timestep();
+  return timestep(); // Caller should do this separately
 }
 
 /*** Runtime API }}} ***/

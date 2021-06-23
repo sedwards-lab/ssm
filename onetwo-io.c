@@ -22,10 +22,6 @@
 #include "ssm-types.h"
 #include "ssm-debug.h"
 
-struct io_read_svt *open_io_var(const char *file_name);
-struct sv *get_stdin_var();
-void close_io_var(struct io_read_svt *v);
-
 typedef struct {
   struct act act;
   ptr_u32_svt a;
@@ -117,14 +113,10 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
 }
 
 void step_main(struct act *act) {
-  /* act_main_t *a = container_of(act, act_main_t, act); */
-  struct sv *stdin_sv = get_stdin_var();
-  assert(stdin_sv);
+  struct sv *stdin_sv = get_stdin_var(); // Return u8_svt instead
+
   switch (act->pc) {
   case 0: {
-    /* /1* We could initialize a->a here, but no need *1/ */
-    /* a->a.sv.vtable->later(&a->a.sv, get_now() + TICKS_PER_SECOND, 10); */
-
     depth_t new_depth = act->depth - 1; /* 2 children */
     priority_t new_priority = act->priority;
     priority_t pinc = 1 << new_depth;
@@ -149,8 +141,7 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
-
-  struct io_read_svt *stdin_sv = open_io_var("stdin"); // Like C programs, assume always avaiable at start
+  initialize_io();
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -160,7 +151,7 @@ int main() {
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
     printf("tick: next = %lu\n", next);
 
-  close_io_var(stdin_sv);
+  deinitialize_io();
 
   return 0;
 }
