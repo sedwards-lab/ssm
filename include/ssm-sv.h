@@ -87,7 +87,9 @@ struct sv {
   struct trigger *triggers;    /* List of sensitive continuations */
   ssm_time_t later_time;       /* When the variable should be next updated */
   ssm_time_t last_updated;     /* When the variable was last updated */
+#ifdef DEBUG
   struct debug_sv debug;       /* For debugging */
+#endif
 };
 
 /**

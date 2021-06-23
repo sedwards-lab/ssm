@@ -27,7 +27,9 @@ struct act {
   priority_t priority; /* Execution priority */
   depth_t depth;       /* Index of the LSB in our priority */
   bool scheduled;      /* True when in the schedule queue */
+#ifdef DEBUG
   struct debug_act debug;
+#endif
 };
 
 /**
@@ -89,7 +91,7 @@ static inline struct act *act_enter(size_t bytes, stepf_t *step,
       .depth = depth,
       .scheduled = false,
   };
-  initialize_debug_act(&act->debug);
+  DEBUG_ACT_SET_ACT_NAME(act->debug, "(unknown act name)");
   return act;
 }
 

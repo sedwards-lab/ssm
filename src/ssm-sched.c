@@ -87,19 +87,28 @@ static void update_event(struct sv *sv) {
   sv->last_updated = sv->later_time;
 
   schedule_all_sensitive_triggers(sv);
-  DEBUG_PRINT("event %lu value %s\n", now, sv->debug.value_repr(sv).buf);
+  DEBUG_PRINT("event %lu value %s\n", now,
+              DEBUG_SV_GET_VALUE_REPR(sv->debug, sv));
 }
 
 /*** Internal helpers }}} ***/
 
 /*** Events API, exposed via ssm-event.h {{{ ***/
 
+#ifdef DEBUG
+static struct debug_buffer value_repr_event(struct sv *sv) {
+  return (struct debug_buffer){.buf = "(unknown/unit value)"};
+}
+#endif
+
 void initialize_event(struct sv *sv) {
   sv->update = NULL;
   sv->triggers = NULL;
   sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
-  initialize_debug_sv(&sv->debug);
+  DEBUG_SV_SET_VAR_NAME(sv->debug, "(unknown var name)");
+  DEBUG_SV_SET_TYPE_NAME(sv->debug, "(unknown/unit type)");
+  DEBUG_SV_SET_VALUE_REPR(sv->debug, value_repr_event);
 }
 
 void assign_event(struct sv *sv, priority_t prio) {

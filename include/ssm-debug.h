@@ -1,12 +1,20 @@
 #ifndef _SSM_DEBUG_H
 #define _SSM_DEBUG_H
 
-#include <ssm-platform.h>
+/**
+ * Platform-agnostic debug interface for SSM.
+ *
+ * TODO: lots of tidying up to get rid of ugly CPP ifdefs etc.
+ */
+
 #include <ssm-core.h>
+#include <ssm-platform.h>
+
+#ifdef DEBUG
 #include <stdio.h> /* TODO: should only be included for debug */
 
+/* FIXME: This is kind of an ugly hack. */
 struct debug_buffer {
-  /* TODO: This is an ugly hack. Do away with it. */
   char buf[32];
 };
 
@@ -22,8 +30,37 @@ struct debug_act {
   const char *act_name;
 };
 
-void initialize_debug_sv(struct debug_sv *sv);
-void initialize_debug_act(struct debug_act *act);
+#define DEBUG_ACT_SET_ACT_NAME(actd, name) ((actd).act_name = (name))
+#define DEBUG_SV_SET_VAR_NAME(svd, name) ((svd).var_name = (name))
+#define DEBUG_SV_SET_TYPE_NAME(svd, name) ((svd).type_name = (name))
+#define DEBUG_SV_SET_VALUE_REPR(svd, vr) ((svd).value_repr = (vr))
+
+#define DEBUG_ACT_GET_ACT_NAME(actd) (actd).act_name
+#define DEBUG_SV_GET_VAR_NAME(svd) (svd).var_name
+#define DEBUG_SV_GET_TYPE_NAME(svd) (svd).type_name
+#define DEBUG_SV_GET_VALUE_REPR(svd, sv) (svd).value_repr(sv).buf
+
+#else
+
+#define DEBUG_ACT_SET_ACT_NAME(actd, name)                                     \
+  do {                                                                         \
+  } while (0)
+#define DEBUG_SV_SET_VAR_NAME(svd, name)                                       \
+  do {                                                                         \
+  } while (0)
+#define DEBUG_SV_SET_TYPE_NAME(svd, name)                                      \
+  do {                                                                         \
+  } while (0)
+#define DEBUG_SV_SET_VALUE_REPR(svd, vr)                                       \
+  do {                                                                         \
+  } while (0)
+
+#define DEBUG_ACT_GET_ACT_NAME(actd) "(no DEBUG; act name unavailable)"
+#define DEBUG_SV_GET_VAR_NAME(svd) "(no DEBUG; var name unavailable)"
+#define DEBUG_SV_GET_TYPE_NAME(svd) "(no DEBUG; type name unavailable)"
+#define DEBUG_SV_GET_VALUE_REPR(svd, sv) "(no DEBUG; value unavailable)"
+
+#endif /* ifdef DEBUG */
 
 #ifndef DEBUG_TRACE
 #define DEBUG_TRACE(...)                                                       \
@@ -42,25 +79,5 @@ void initialize_debug_act(struct debug_act *act);
   do {                                                                         \
   } while (0)
 #endif
-
-#ifdef DEBUG
-
-/** Attach a procedure name to an activation record struct */
-#define DEBUG_ACT_NAME(act, name) (act)->act_name = (name)
-
-/** Attach a variable name to a scheduled variable struct */
-#define DEBUG_SV_NAME(sv, name) (sv)->var_name = (name)
-
-#else
-
-#define DEBUG_ACT_NAME(act, name)                                              \
-  do {                                                                         \
-  } while (0)
-
-#define DEBUG_SV_NAME(sv, name)                                                \
-  do {                                                                         \
-  } while (0)
-
-#endif /* ifdef DEBUG */
 
 #endif /* ifndef _SSM_DEBUG_H */
