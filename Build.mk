@@ -4,13 +4,13 @@
 ##
 
 CPPFLAGS += -I $(RUNTIMEDIR)/include
-LDLIBS += -lpeng
+LDLIBS += -lssm
 
 vpath %.c $(RUNTIMEDIR)/src
 
 RUNTIMESRC := ssm-queue.c ssm-sched.c ssm-types.c
 
 SRCS += $(RUNTIMESRC)
-LIBS += libpeng.a
+LIBS += libssm.a
 
-libpeng.a : libpeng.a($(RUNTIMESRC:%.c=%.o))
+libssm.a : libssm.a($(RUNTIMESRC:%.c=%.o))
