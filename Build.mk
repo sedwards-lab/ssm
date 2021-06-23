@@ -8,7 +8,7 @@ LDLIBS += -lpeng
 
 vpath %.c $(RUNTIMEDIR)/src
 
-RUNTIMESRC := peng-scheduler.c peng-bool.c peng-int64.c peng-int.c peng-uint8.c
+RUNTIMESRC := ssm-queue.c ssm-sched.c ssm-types.c
 
 SRCS += $(RUNTIMESRC)
 LIBS += libpeng.a
