@@ -42,8 +42,8 @@ struct io_read_svt *open_io_var(const char *file_name) {
   return v;
 }
 
-struct sv *get_stdin_var() {
-  return &io_vars[0].u8_sv.sv;
+u8_svt *get_stdin_var() {
+  return &io_vars[0].u8_sv;
 }
 
 void close_io_var(struct io_read_svt *v) {

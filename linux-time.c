@@ -74,7 +74,6 @@ ssm_time_t timestep() {
   for (int i = 0; i < MAX_IO_VARS; i++) {
     struct io_read_svt *io_sv = io_vars + i;
     if (!io_sv->is_open) continue;
-    printf("in this one\n");
     FD_SET(io_sv->fd, &read_fds);
     if (io_sv->fd > max_fd)
       max_fd = io_sv->fd;

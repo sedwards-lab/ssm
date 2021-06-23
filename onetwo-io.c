@@ -114,7 +114,7 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
 
 void step_main(struct act *act) {
   initialize_io();
-  struct sv *stdin_sv = get_stdin_var(); // Return u8_svt instead
+  u8_svt *stdin_sv = get_stdin_var();
 
   switch (act->pc) {
   case 0: {
@@ -122,16 +122,15 @@ void step_main(struct act *act) {
     priority_t new_priority = act->priority;
     priority_t pinc = 1 << new_depth;
 
-    act_fork(enter_one(act, new_priority, new_depth, PTR_OF_SV(*stdin_sv)));
+    act_fork(enter_one(act, new_priority, new_depth, PTR_OF_SV(stdin_sv->sv)));
     new_priority += pinc;
 
-    act_fork(enter_two(act, new_priority, new_depth, PTR_OF_SV(*stdin_sv)));
+    act_fork(enter_two(act, new_priority, new_depth, PTR_OF_SV(stdin_sv->sv)));
     act->pc = 1;
     return;
   }
   case 1: {
-    u8_svt *v = container_of(stdin_sv, u8_svt, sv);
-    printf("a = %d\n", v->value);
+    printf("a = %d\n", stdin_sv->value);
     act_leave(act, sizeof(act_main_t));
     deinitialize_io();
     return;

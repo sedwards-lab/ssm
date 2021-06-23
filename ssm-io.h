@@ -15,13 +15,20 @@ struct io_read_svt {
   bool is_open;
 };
 
-/* Doubly linked list of all open files in the program -- our representation of
- * the file descriptor table.
+/*
+ * Our representation of the file descriptor table.
  */
 #define MAX_IO_VARS 256
 struct io_read_svt io_vars[MAX_IO_VARS];
 
+/*
+ * Initialize file descriptor table and prepopulate stdin.
+ */
 void initialize_io();
+
+/*
+ * Close all remaining file descriptors in table.
+ */
 void deinitialize_io();
 
 /*
@@ -32,7 +39,7 @@ struct io_read_svt *open_io_var(const char *file_name);
 /*
  * Return the sv representing stdin. Assumed to be open by all programs.
  */
-struct sv *get_stdin_var();
+u8_svt *get_stdin_var();
 
 /*
  * Close the file represented by v.
