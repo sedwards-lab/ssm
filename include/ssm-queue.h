@@ -16,7 +16,7 @@
  * for priority.
  */
 
-#include "ssm-core.h" /* for ssm_time_t */
+#include <ssm-core.h> /* for ssm_time_t */
 #include <stddef.h>   /* for size_t */
 
 /** Queue index type; these are 1-indexed*/

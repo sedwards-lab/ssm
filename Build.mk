@@ -8,7 +8,7 @@ LDLIBS += -lssm
 
 vpath %.c $(RUNTIMEDIR)/src
 
-RUNTIMESRC := ssm-queue.c ssm-sched.c ssm-types.c
+RUNTIMESRC := ssm-queue.c ssm-sched.c ssm-types.c ssm-debug.c
 
 SRCS += $(RUNTIMESRC)
 LIBS += libssm.a

@@ -9,7 +9,8 @@
  * For type-specific specifications, see ssm-types.h.
  */
 
-#include "ssm-core.h"
+#include <ssm-core.h>
+#include <ssm-debug.h>
 
 /**
  * The virtual table for each scheduled variable type.
@@ -69,13 +70,6 @@ struct svtable {
   void (*later)(struct sv *, ssm_time_t, const uint64_t);
 };
 
-/** SV debug information. */
-struct sv_debug {
-  const char *var_name;
-  const char *type_name;
-  const char *formatter;
-};
-
 /**
  * The "base class" for other scheduled variable types.
  *
@@ -93,7 +87,7 @@ struct sv {
   struct trigger *triggers;    /* List of sensitive continuations */
   ssm_time_t later_time;       /* When the variable should be next updated */
   ssm_time_t last_updated;     /* When the variable was last updated */
-  struct sv_debug debug;       /* For debugging */
+  struct debug_sv debug;       /* For debugging */
 };
 
 /**

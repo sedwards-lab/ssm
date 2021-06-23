@@ -10,8 +10,12 @@
 #include <stdbool.h>
 #include <stddef.h> /* For offsetof */
 #include <stdint.h>
-#include <stdio.h> /* should only be included for debug */
 #include <stdlib.h>
+
+/*** Forward struct declarations ***/
+struct sv;      /* Defined in ssm-sv.h */
+struct trigger; /* Defined in ssm-act.h */
+struct act;     /* Defined in ssm-act.h */
 
 /** Logical microsecond timestamps: assumed never to overflow. */
 typedef uint64_t ssm_time_t;
@@ -41,12 +45,6 @@ typedef uint8_t depth_t;
  * FIXME: hide behind getter and setter.
  */
 extern ssm_time_t now;
-
-/*** Forward struct declarations ***/
-
-struct sv;      /* Defined in ssm-sv.h */
-struct trigger; /* Defined in ssm-act.h */
-struct act;     /* Defined in ssm-act.h */
 
 /**
  * Implementation of container_of that falls back to ISO C99 when GNU C is not

@@ -6,10 +6,10 @@
  * and synthesize type-specific code for per-type implementations exposed by
  * this compilation unit.
  */
-#include "ssm-queue.h"
-#include "ssm-act.h"        /* for definition of struct act */
-#include "ssm-queue-test.h" /* for testing */
-#include "ssm-sv.h"         /* for definition of struct sv */
+#include <ssm-act.h>        /* for definition of struct act */
+#include <ssm-queue-test.h> /* for testing */
+#include <ssm-queue.h>
+#include <ssm-sv.h> /* for definition of struct sv */
 
 /*** Priority queue logic {{{ */
 

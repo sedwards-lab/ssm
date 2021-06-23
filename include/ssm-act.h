@@ -10,17 +10,13 @@
  * applications.
  */
 
-#include "ssm-core.h"
+#include <ssm-core.h>
+#include <ssm-debug.h>
 
 struct act;
 
 /** Type of a step function */
 typedef void stepf_t(struct act *);
-
-/** Debug information for activation records. */
-struct act_debug {
-  const char *act_name;
-};
 
 /** Routine activation record "base class" */
 struct act {
@@ -31,7 +27,7 @@ struct act {
   priority_t priority; /* Execution priority */
   depth_t depth;       /* Index of the LSB in our priority */
   bool scheduled;      /* True when in the schedule queue */
-  struct act_debug debug;
+  struct debug_act debug;
 };
 
 /**
@@ -93,7 +89,7 @@ static inline struct act *act_enter(size_t bytes, stepf_t *step,
       .depth = depth,
       .scheduled = false,
   };
-  act->debug.act_name = "(no act name)";
+  initialize_debug_act(&act->debug);
   return act;
 }
 
@@ -105,9 +101,9 @@ static inline void act_leave(struct act *act, size_t bytes) {
   assert(act->caller);
   assert(act->caller->step);
   struct act *caller = act->caller;
-  free(act); // Free the whole activation record, not just the start
-  if ((--caller->children) == 0) // Were we the last child?
-    act_call(caller);            // If so, run our parent
+  free(act); /* Free the whole activation record, not just the start */
+  if ((--caller->children) == 0)
+    act_call(caller); /* If we were the last child, run our parent */
 }
 
 /**

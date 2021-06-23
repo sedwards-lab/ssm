@@ -16,7 +16,7 @@
 /**
  * Used by the runtime to control execution of a program.
  */
-#include "ssm-core.h"
+#include <ssm-core.h>
 
 /**
  * Initialize the runtime system to start at some time, which is when tick

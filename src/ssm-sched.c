@@ -3,10 +3,10 @@
  * events and abstract activation records.
  */
 
-#include "ssm-act.h"
-#include "ssm-queue.h"
-#include "ssm-runtime.h"
-#include "ssm-sv.h"
+#include <ssm-act.h>
+#include <ssm-queue.h>
+#include <ssm-runtime.h>
+#include <ssm-sv.h>
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
@@ -87,8 +87,7 @@ static void update_event(struct sv *sv) {
   sv->last_updated = sv->later_time;
 
   schedule_all_sensitive_triggers(sv);
-
-  // TODO: DEBUG_PRINT("event %lu value %s\n", now, buffer);
+  DEBUG_PRINT("event %lu value %s\n", now, sv->debug.value_repr(sv).buf);
 }
 
 /*** Internal helpers }}} ***/
@@ -100,9 +99,7 @@ void initialize_event(struct sv *sv) {
   sv->triggers = NULL;
   sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
-  sv->debug.var_name = "(no var name)";
-  sv->debug.type_name = "(no type name)";
-  sv->debug.formatter = "(no formatter)";
+  initialize_debug_sv(&sv->debug);
 }
 
 void assign_event(struct sv *sv, priority_t prio) {
@@ -211,7 +208,7 @@ void tick() {
       requeue_event(event_queue, &event_queue_len, QUEUE_HEAD);
   }
 
-  // TODO: DEBUG_PRINT("numconts %d\n", cont_queue_len);
+  DEBUG_PRINT("numconts %ld\n", act_queue_len);
 
   /*
    * Until the queue is empty, take the lowest-numbered continuation from the
