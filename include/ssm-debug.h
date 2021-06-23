@@ -1,6 +1,26 @@
 #ifndef _SSM_DEBUG_H
 #define _SSM_DEBUG_H
 
+#include <ssm-platform.h>
+
+#ifndef DEBUG_TRACE
+#define DEBUG_TRACE(...)                                                       \
+  do {                                                                         \
+  } while (0)
+#endif
+
+#ifndef DEBUG_PRINT
+#define DEBUG_PRINT(...)                                                       \
+  do {                                                                         \
+  } while (0)
+#endif
+
+#ifndef DEBUG_ASSERT
+#define DEBUG_ASSERT(assertion, ...)                                           \
+  do {                                                                         \
+  } while (0)
+#endif
+
 #ifdef DEBUG
 
 /** Attach a procedure name to an activation record struct */

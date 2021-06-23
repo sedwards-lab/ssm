@@ -79,32 +79,30 @@ static void schedule_all_sensitive_triggers(struct sv *sv) {
 static void update_event(struct sv *sv) {
   assert(sv->later_time == now);
 
-#ifdef DEBUG
-  printf("update event: %s\n", sv->var_name);
-#endif
-  if (sv->vtable)
-  /* Non-unit type, so we need to call update method to update payload */
-#ifdef DEBUG
-    printf("calling update: %s\n", sv->vtable->type_name),
-#endif
-        sv->vtable->update(sv);
+  if (sv->update)
+    /* Non-unit type, so we need to call update method to update payload */
+    sv->update(sv);
 
   sv->later_time = NO_EVENT_SCHEDULED;
   sv->last_updated = sv->later_time;
 
   schedule_all_sensitive_triggers(sv);
+
+  // TODO: DEBUG_PRINT("event %lu value %s\n", now, buffer);
 }
 
 /*** Internal helpers }}} ***/
 
 /*** Events API, exposed via ssm-event.h {{{ ***/
 
-void initialize_event(struct sv *sv, const struct svtable *vtable) {
-  sv->vtable = vtable;
+void initialize_event(struct sv *sv) {
+  sv->update = NULL;
   sv->triggers = NULL;
   sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
-  sv->var_name = "(no var name)";
+  sv->debug.var_name = "(no var name)";
+  sv->debug.type_name = "(no type name)";
+  sv->debug.formatter = "(no formatter)";
 }
 
 void assign_event(struct sv *sv, priority_t prio) {
@@ -190,19 +188,19 @@ void desensitize(struct trigger *trigger) {
 
 void initialize_ssm(ssm_time_t start) { now = start; }
 
-ssm_time_t tick() {
-#ifdef DEBUG
-  printf("tick called. event_queue_len: %lu\n", event_queue_len);
-#endif
+ssm_time_t next_event_time(void) {
+  return event_queue_len ? event_queue[QUEUE_HEAD]->later_time
+                         : NO_EVENT_SCHEDULED;
+}
+
+void tick() {
   /*
    * For each queued event scheduled for the current time, remove the event from
    * the queue, update its variable, and schedule everything sensitive to it.
    */
   while (event_queue_len > 0 && event_queue[QUEUE_HEAD]->later_time == now) {
     struct sv *sv = event_queue[QUEUE_HEAD];
-#ifdef DEBUG
-    printf("Enacting event: \n");
-#endif
+
     update_event(sv);
 
     if (sv->later_time == NO_EVENT_SCHEDULED)
@@ -213,6 +211,8 @@ ssm_time_t tick() {
       requeue_event(event_queue, &event_queue_len, QUEUE_HEAD);
   }
 
+  // TODO: DEBUG_PRINT("numconts %d\n", cont_queue_len);
+
   /*
    * Until the queue is empty, take the lowest-numbered continuation from the
    * activation record queue and run it, which might insert additional
@@ -221,29 +221,10 @@ ssm_time_t tick() {
    * Note that we remove it from the queue first before running it in case it
    * tries to schedule itself.
    */
-#ifdef DEBUG
-  printf("running activation records now. act_queue_len: %lu.\n",
-         act_queue_len);
-  for (int i = 0; i < act_queue_len; i++)
-    printf("\tact: %s\n", act_queue[QUEUE_HEAD + i]->act_name);
-#endif
-
   while (act_queue_len > 0) {
     struct act *to_run = unschedule_act(QUEUE_HEAD);
-#ifdef DEBUG
-    printf("Running routine: %s (act_queue_len: %ld)\n", to_run->act_name,
-           act_queue_len);
-#endif
     to_run->step(to_run);
   }
-
-  /*
-   * FIXME: this interface isn't really usable. We want the runtime driver to be
-   * able to interrupt sooner than now, so that it can respond to I/O etc.
-   */
-  now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                            : NO_EVENT_SCHEDULED;
-  return now;
 }
 
 /*** Runtime API }}} ***/

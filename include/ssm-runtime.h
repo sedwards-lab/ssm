@@ -29,6 +29,6 @@ extern void initialize_ssm(ssm_time_t);
 /**
  * Execute the system for the current instant, and returns the next event time.
  */
-extern ssm_time_t tick(void);
+extern void tick(void);
 
 #endif /* ifndef _SSM_RUNTIME_H */

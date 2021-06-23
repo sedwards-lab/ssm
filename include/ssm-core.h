@@ -10,16 +10,14 @@
 #include <stdbool.h>
 #include <stddef.h> /* For offsetof */
 #include <stdint.h>
+#include <stdio.h> /* should only be included for debug */
 #include <stdlib.h>
-#ifdef DEBUG
-#include <stdio.h>
-#endif
 
-/** Logical microsecond timestamps: assumed never to overflow */
+/** Logical microsecond timestamps: assumed never to overflow. */
 typedef uint64_t ssm_time_t;
 
-/** ssm_time_t counts microseconds */
-#define TICKS_PER_SECOND 1000000
+/** ssm_time_t counts microseconds. */
+#define TICKS_PER_SECOND (1000 * 1000)
 
 /** Scheduling an event for this time is the same as unscheduling it. */
 #define NO_EVENT_SCHEDULED ULONG_MAX
@@ -28,7 +26,7 @@ typedef uint64_t ssm_time_t;
 typedef uint32_t priority_t;
 
 /** The priority at the entry point of an SSM program. */
-#define PRIORITY_AT_ROOT              0
+#define PRIORITY_AT_ROOT 0
 
 /** Index of least significant priority bit */
 typedef uint8_t depth_t;
@@ -39,6 +37,8 @@ typedef uint8_t depth_t;
 /**
  * The logical time of the current instant.
  * Defined and maintained by ssm-sched.c. Should not be modified by anyone else.
+ *
+ * FIXME: hide behind getter and setter.
  */
 extern ssm_time_t now;
 

@@ -17,18 +17,21 @@ struct act;
 /** Type of a step function */
 typedef void stepf_t(struct act *);
 
+/** Debug information for activation records. */
+struct act_debug {
+  const char *act_name;
+};
+
 /** Routine activation record "base class" */
 struct act {
-  stepf_t *step;       /** C function for running this continuation */
-  struct act *caller;  /** Activation record of caller */
-  uint16_t pc;         /** Stored "program counter" for the function */
-  uint16_t children;   /** Number of running child threads */
-  priority_t priority; /** Execution priority */
-  depth_t depth;       /** Index of the LSB in our priority */
-  bool scheduled;      /** True when in the schedule queue */
-#ifdef DEBUG
-  const char *act_name;
-#endif
+  stepf_t *step;       /* C function for running this continuation */
+  struct act *caller;  /* Activation record of caller */
+  uint16_t pc;         /* Stored "program counter" for the function */
+  uint16_t children;   /* Number of running child threads */
+  priority_t priority; /* Execution priority */
+  depth_t depth;       /* Index of the LSB in our priority */
+  bool scheduled;      /* True when in the schedule queue */
+  struct act_debug debug;
 };
 
 /**
@@ -81,17 +84,16 @@ static inline struct act *act_enter(size_t bytes, stepf_t *step,
   assert(parent);
   ++parent->children;
   struct act *act = (struct act *)malloc(bytes);
-  *act = (struct act){.step = step,
-                      .caller = parent,
-                      .pc = 0,
-                      .children = 0,
-                      .priority = priority,
-                      .depth = depth,
-                      .scheduled = false,
-#ifdef DEBUG
-                      .act_name = "(no act name)"
-#endif
+  *act = (struct act){
+      .step = step,
+      .caller = parent,
+      .pc = 0,
+      .children = 0,
+      .priority = priority,
+      .depth = depth,
+      .scheduled = false,
   };
+  act->debug.act_name = "(no act name)";
   return act;
 }
 
@@ -108,6 +110,12 @@ static inline void act_leave(struct act *act, size_t bytes) {
     act_call(caller);            // If so, run our parent
 }
 
-/* TODO: add leave_no_sched */
+/**
+ * Deallocate an activation record, but don't return to caller.
+ */
+static inline void act_dealloc(struct act *act, size_t bytes) {
+  assert(act);
+  free(act);
+}
 
 #endif /* _SSM_ACT_H */

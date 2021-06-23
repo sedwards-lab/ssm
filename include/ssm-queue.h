@@ -14,8 +14,6 @@
  * the only difference being (1) the different sizes of the underlying type, and
  * (2) the different ways in which elements should be compared with one another
  * for priority.
- *
- * NOTE (j-hui): in this branch, I've removed inner queues for simplicity.
  */
 
 #include "ssm-core.h" /* for ssm_time_t */
@@ -39,16 +37,18 @@ typedef size_t idx_t;
 
 void enqueue_event(struct sv **event_queue, size_t *queue_len,
                    struct sv *to_insert);
-void dequeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_dequeue);
-void requeue_event(struct sv **event_queue, size_t *queue_len, idx_t to_requeue);
+void dequeue_event(struct sv **event_queue, size_t *queue_len,
+                   idx_t to_dequeue);
+void requeue_event(struct sv **event_queue, size_t *queue_len,
+                   idx_t to_requeue);
 idx_t index_of_event(struct sv **event_queue, size_t *queue_len,
-                    struct sv *to_find);
+                     struct sv *to_find);
 
 void enqueue_act(struct act **act_queue, size_t *queue_len,
                  struct act *to_insert);
 void dequeue_act(struct act **act_queue, size_t *queue_len, idx_t to_dequeue);
 void requeue_act(struct act **act_queue, size_t *queue_len, idx_t to_requeue);
 idx_t index_of_act(struct act **act_queue, size_t *queue_len,
-                  struct act *to_find);
+                   struct act *to_find);
 
 #endif /* ifndef _QUEUE_H */
