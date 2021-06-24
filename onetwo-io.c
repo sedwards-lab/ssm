@@ -113,8 +113,8 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
 }
 
 void step_main(struct act *act) {
-  initialize_io();
   u8_svt *stdin_sv = get_stdin_var();
+  ssm_runtime_alive = true;
 
   switch (act->pc) {
   case 0: {
@@ -132,7 +132,7 @@ void step_main(struct act *act) {
   case 1: {
     printf("a = %d\n", stdin_sv->value);
     act_leave(act, sizeof(act_main_t));
-    deinitialize_io();
+    ssm_runtime_alive = false;
     return;
   }
   }
@@ -142,6 +142,7 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
+  initialize_io();
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -151,5 +152,6 @@ int main() {
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
     printf("tick: next = %lu\n", next);
 
+  deinitialize_io();
   return 0;
 }

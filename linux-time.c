@@ -130,7 +130,7 @@ ssm_time_t timestep() {
     }
   } else {
     // No events scheduled, but check if any io to block on
-    if (max_fd != -1) {
+    if (ssm_runtime_alive && max_fd != -1) {
       int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, NULL, NULL);
       if (ret < 0) {
           perror("pselect");

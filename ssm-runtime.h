@@ -28,6 +28,12 @@
 extern void initialize_ssm(ssm_time_t);
 
 /**
+ * Flag to indicate that the ssm system is still alive. Set to false once
+ * all routines complete.
+ */
+extern bool ssm_runtime_alive;
+
+/**
  * Execute the system for the current instant, and returns the next event time.
  */
 extern ssm_time_t tick(void);
