@@ -86,8 +86,8 @@ static void update_event(struct sv *sv) {
     /* Non-unit type, so we need to call update method to update payload */
     sv->update(sv);
 
+  sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
-  sv->last_updated = sv->later_time;
 
   schedule_all_sensitive_triggers(sv);
   DEBUG_PRINT("event %lu value %s %s\n", now, DEBUG_SV_GET_TYPE_NAME(sv->debug),
