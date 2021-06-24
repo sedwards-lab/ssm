@@ -9,6 +9,12 @@
 #include "ssm-core.h"
 #include "ssm-sv.h"
 
+#ifdef bool
+/* This shouldn't be a macro, should be a typedef */
+#undef bool
+typedef _Bool bool;
+#endif
+
 /*** Unit type {{{
  *
  * Unit types are just "pure" events without payloads, and are all that the
