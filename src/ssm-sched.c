@@ -147,9 +147,7 @@ void later_event(struct sv *sv, ssm_time_t then) {
   }
 }
 
-ssm_time_t last_updated_event(struct sv *sv) { return sv->last_updated; }
-
-bool event_on(struct sv *var) { return var->later_time == now; }
+bool event_on(struct sv *var) { return var->last_updated == now; }
 
 /*** Events API }}} ***/
 
@@ -194,8 +192,6 @@ void desensitize(struct trigger *trigger) {
 /*** Activation records API }}} ***/
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
-
-void initialize_ssm(ssm_time_t start) { now = start; }
 
 ssm_time_t next_event_time(void) {
   return event_queue_len ? event_queue[QUEUE_HEAD]->later_time

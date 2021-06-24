@@ -19,14 +19,6 @@
 #include <ssm-core.h>
 
 /**
- * Initialize the runtime system to start at some time, which is when tick
- * should next be called.
- *
- * This should only be called once.
- */
-extern void initialize_ssm(ssm_time_t);
-
-/**
  * Execute the system for the current instant, and returns the next event time.
  */
 extern void tick(void);
