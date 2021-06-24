@@ -11,7 +11,7 @@
 #include "ssm-queue.h"
 #include "ssm-sv.h"
 #include "ssm-runtime.h"
-#include "time-driver.h"
+#include "ssm-time-driver.h"
 
 /**
  * Timestamp of the last tick in the runtime.

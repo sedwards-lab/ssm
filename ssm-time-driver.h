@@ -1,5 +1,5 @@
-#ifndef __TIME_DRIVER_H
-#define __TIME_DRIVER_H
+#ifndef __SSM_TIME_DRIVER_H
+#define __SSM_TIME_DRIVER_H
 
 /**
  * This header file should be implemented by an implementation of a time
@@ -21,4 +21,4 @@ extern void initialize_time_driver();
  */
 extern ssm_time_t timestep();
 
-#endif /* ifndef __TIME_DRIVER_H */
+#endif /* ifndef __SSM_TIME_DRIVER_H */

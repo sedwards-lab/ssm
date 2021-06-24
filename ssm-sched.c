@@ -8,7 +8,7 @@
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
 
-#include "time-driver.h" // Remove this
+#include "ssm-time-driver.h"
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024

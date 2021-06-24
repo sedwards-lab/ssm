@@ -7,6 +7,7 @@
 #include "ssm-queue.h"
 #include "ssm-sv.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 
 /*** Time driver API, exposed via time-driver.h {{{ ***/
 

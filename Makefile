@@ -23,7 +23,7 @@ clean :
 compile_commands.json: Makefile
 	bear make all
 
-$(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h time-driver.h
+$(obj_EXE) $(obj_SSMLIB) : ssm-act.h ssm-core.h ssm-queue.h ssm-runtime.h ssm-sv.h ssm-types.h ssm-time-driver.h
 
 fib : fib.o $(obj_SSMLIB)
 	$(CC) $(CFLAGS) -o $@ $^

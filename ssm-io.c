@@ -11,7 +11,6 @@
 #include "ssm-io.h"
 
 void initialize_io() {
-  // Initialize stdin
   struct io_read_svt *stdin_v = &io_vars[0];
   initialize_event(&stdin_v->u8_sv.sv, &u8_vtable);
   stdin_v->fd = STDIN_FILENO;
