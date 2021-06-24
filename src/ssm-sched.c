@@ -8,8 +8,8 @@
 #include <ssm-runtime.h>
 #include <ssm-sv.h>
 
-#define ACT_QUEUE_SIZE 1024
-#define EVENT_QUEUE_SIZE 1024
+#define ACT_QUEUE_SIZE 128
+#define EVENT_QUEUE_SIZE 256
 
 /**
  * Event queue, used to track and schedule events between instants.
@@ -37,8 +37,11 @@ ssm_time_t now;
 /*** Internal helpers {{{ ***/
 
 static void schedule_act(struct act *act) {
-  if (!act->scheduled)
+  DEBUG_ASSERT(((int8_t) act->depth) >= 0, "negative depth\n");
+  if (!act->scheduled) {
+    DEBUG_ASSERT(act_queue_len + 1 <= ACT_QUEUE_SIZE, "contqueue full\n");
     enqueue_act(act_queue, &act_queue_len, act);
+  }
   act->scheduled = true;
 }
 
@@ -111,19 +114,16 @@ void initialize_event(struct sv *sv) {
   DEBUG_SV_SET_VALUE_REPR(sv->debug, value_repr_event);
 }
 
-void assign_event(struct sv *sv, priority_t prio) {
-  if (sv->later_time != NO_EVENT_SCHEDULED) {
-    /* Note that for aggregate data types, we assume that any conflicting
-     * updates have been resolved by this point. If sv->later_time is not set to
-     * NO_EVENT_SCHEDULED, that means we need to unschedule this sv from the
-     * event queue.
-     */
-    idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
-    assert(QUEUE_HEAD <= idx);
+void unsched_event(struct sv *sv) {
+  idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
+  assert(QUEUE_HEAD <= idx);
+  sv->later_time = NO_EVENT_SCHEDULED;
+  dequeue_event(event_queue, &event_queue_len, idx);
+}
 
-    sv->later_time = NO_EVENT_SCHEDULED;
-    dequeue_event(event_queue, &event_queue_len, idx);
-  }
+void assign_event(struct sv *sv, priority_t prio) {
+  if (sv->later_time != NO_EVENT_SCHEDULED)
+    unsched_event(sv);
 
   sv->last_updated = now;
   schedule_sensitive_triggers(sv, prio);
@@ -131,10 +131,11 @@ void assign_event(struct sv *sv, priority_t prio) {
 
 void later_event(struct sv *sv, ssm_time_t then) {
   assert(then != NO_EVENT_SCHEDULED);
-  assert(now < then);
+  DEBUG_ASSERT(now < then, "bad after\n");
 
   if (sv->later_time == NO_EVENT_SCHEDULED) {
     /* This event isn't already scheduled, so add it to the event queue. */
+    DEBUG_ASSERT(event_queue_len + 1 <= EVENT_QUEUE_SIZE, "eventqueue full\n");
     sv->later_time = then;
     enqueue_event(event_queue, &event_queue_len, sv);
   } else {
@@ -147,6 +148,8 @@ void later_event(struct sv *sv, ssm_time_t then) {
 }
 
 ssm_time_t last_updated_event(struct sv *sv) { return sv->last_updated; }
+
+bool event_on(struct sv *var) { return var->later_time == now; }
 
 /*** Events API }}} ***/
 
@@ -199,6 +202,8 @@ ssm_time_t next_event_time(void) {
                          : NO_EVENT_SCHEDULED;
 }
 
+void set_now(ssm_time_t t) { now = t; }
+
 void tick() {
   /*
    * For each queued event scheduled for the current time, remove the event from
@@ -231,6 +236,7 @@ void tick() {
     struct act *to_run = unschedule_act(QUEUE_HEAD);
     to_run->step(to_run);
   }
+  DEBUG_PRINT("now %lu eventqueuesize %ld\n", now, event_queue_len);
 }
 
 /*** Runtime API }}} ***/

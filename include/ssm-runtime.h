@@ -31,4 +31,14 @@ extern void initialize_ssm(ssm_time_t);
  */
 extern void tick(void);
 
+/**
+ * Set the current time.
+ */
+extern void set_now(ssm_time_t);
+
+/**
+ * The time of the earliest event in the event queue.
+ */
+ssm_time_t next_event_time(void);
+
 #endif /* ifndef _SSM_RUNTIME_H */

@@ -28,17 +28,15 @@
     payload_t##_svt *v = container_of(sv, payload_t##_svt, sv);                \
     v->value = v->later_value;                                                 \
   }                                                                            \
-  void assign_##payload_t(struct sv *sv, priority_t prio,                      \
+  void assign_##payload_t(payload_t##_svt *v, priority_t prio,                 \
                           const payload_t value) {                             \
-    payload_t##_svt *v = container_of(sv, payload_t##_svt, sv);                \
-    v->value = (payload_t)value;                                               \
-    assign_event(sv, prio);                                                    \
+    v->value = value;                                                          \
+    assign_event(&v->sv, prio);                                                \
   }                                                                            \
-  void later_##payload_t(struct sv *sv, ssm_time_t then,                       \
+  void later_##payload_t(payload_t##_svt *v, ssm_time_t then,                  \
                          const payload_t value) {                              \
-    payload_t##_svt *v = container_of(sv, payload_t##_svt, sv);                \
-    v->later_value = (payload_t)value;                                         \
-    later_event(sv, then);                                                     \
+    v->later_value = value;                                                    \
+    later_event(&v->sv, then);                                                 \
   }                                                                            \
   void initialize_##payload_t(payload_t##_svt *v) {                            \
     initialize_event(&v->sv);                                                  \

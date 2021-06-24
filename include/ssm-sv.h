@@ -97,8 +97,10 @@ struct sv {
  * used by type-specific implementations.
  */
 extern void initialize_event(struct sv *);
+extern void unsched_event(struct sv *);
 extern void assign_event(struct sv *, priority_t);
 extern void later_event(struct sv *, ssm_time_t);
 extern ssm_time_t last_updated_event(struct sv *);
+extern bool event_on(struct sv *var);
 
 #endif /* _SSM_SV_H */

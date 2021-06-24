@@ -108,12 +108,4 @@ static inline void act_leave(struct act *act, size_t bytes) {
     act_call(caller); /* If we were the last child, run our parent */
 }
 
-/**
- * Deallocate an activation record, but don't return to caller.
- */
-static inline void act_dealloc(struct act *act, size_t bytes) {
-  assert(act);
-  free(act);
-}
-
 #endif /* _SSM_ACT_H */

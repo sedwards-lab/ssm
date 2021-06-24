@@ -35,9 +35,9 @@ typedef struct sv unit_svt;
     payload_t value;       /* Current value */                                 \
     payload_t later_value; /* Buffered value */                                \
   } payload_t##_svt;                                                           \
-  void assign_##payload_t(struct sv *sv, priority_t prio,                      \
+  void assign_##payload_t(payload_t##_svt *sv, priority_t prio,                \
                           const payload_t value);                              \
-  void later_##payload_t(struct sv *sv, ssm_time_t then,                       \
+  void later_##payload_t(payload_t##_svt *sv, ssm_time_t then,                 \
                          const payload_t value);                               \
   void initialize_##payload_t(payload_t##_svt *v)
 
