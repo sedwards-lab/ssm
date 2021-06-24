@@ -37,7 +37,7 @@ ssm_time_t now;
 /*** Internal helpers {{{ ***/
 
 static void schedule_act(struct act *act) {
-  DEBUG_ASSERT(((int8_t) act->depth) >= 0, "negative depth\n");
+  DEBUG_ASSERT(((int8_t)act->depth) >= 0, "negative depth\n");
   if (!act->scheduled) {
     DEBUG_ASSERT(act_queue_len + 1 <= ACT_QUEUE_SIZE, "contqueue full\n");
     enqueue_act(act_queue, &act_queue_len, act);
@@ -90,7 +90,7 @@ static void update_event(struct sv *sv) {
   sv->last_updated = sv->later_time;
 
   schedule_all_sensitive_triggers(sv);
-  DEBUG_PRINT("event %lu value %s\n", now,
+  DEBUG_PRINT("event %lu value %s %s\n", now, DEBUG_SV_GET_TYPE_NAME(sv->debug),
               DEBUG_SV_GET_VALUE_REPR(sv->debug, sv));
 }
 
