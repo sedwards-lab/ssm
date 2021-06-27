@@ -21,6 +21,7 @@
 
 #include "ssm-act.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 #include "ssm-debug.h"
 
@@ -150,14 +151,18 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
+  initialize_time_driver();
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("tick: next = %lu\n", next);
+  tick();
+  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
+       tick(), next = timestep()) {
+    printf("tick: next %lu\n", next);
+  }
 
   return 0;
 }

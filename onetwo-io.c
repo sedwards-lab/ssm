@@ -19,6 +19,7 @@
 
 #include "ssm-act.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 #include "ssm-debug.h"
 
@@ -149,7 +150,9 @@ int main() {
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
+  tick();
+  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
+       tick(), next = timestep())
     printf("tick: next = %lu\n", next);
 
   deinitialize_io();

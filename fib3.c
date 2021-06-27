@@ -24,6 +24,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -176,8 +177,13 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
+  initialize_time_driver();
+
+  tick();
+  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
+       tick(), next = timestep()) {
     printf("get_now() %lu\n", next);
+  }
 
   printf("%d\n", result.value);
   return 0;

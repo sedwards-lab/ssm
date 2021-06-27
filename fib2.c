@@ -16,6 +16,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -91,7 +92,9 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
+  initialize_time_driver();
   tick();
+  timestep();
 
   printf("%d\n", result.value);
 

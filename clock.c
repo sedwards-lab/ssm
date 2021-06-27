@@ -24,6 +24,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -186,6 +187,7 @@ int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 20;
 
   initialize_ssm(0);
+  initialize_time_driver();
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -193,9 +195,11 @@ int main(int argc, char *argv[]) {
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 
-  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick())
-    printf("next %lu\n", get_now());
+  tick();
+  for (ssm_time_t next = timestep(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
+       stop_at--, tick(), next = timestep()) {
+    printf("next %lu\n", next);
+  }
 
   return 0;
 }

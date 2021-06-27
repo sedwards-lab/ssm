@@ -8,8 +8,6 @@
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
 
-#include "ssm-time-driver.h"
-
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
 
@@ -194,7 +192,6 @@ void desensitize(struct trigger *trigger) {
 
 void initialize_ssm(ssm_time_t start) {
   now = start;
-  initialize_time_driver(); // Let caller do this
 }
 
 const struct sv *peek_event_queue() {
@@ -205,7 +202,7 @@ ssm_time_t get_now() { return now; }
 
 void set_now(ssm_time_t n) { now = n; }
 
-ssm_time_t tick() {
+void tick() {
 #ifdef DEBUG
   printf("tick called. event_queue_len: %lu\n", event_queue_len);
 #endif
@@ -251,8 +248,6 @@ ssm_time_t tick() {
 #endif
     to_run->step(to_run);
   }
-
-  return timestep(); // Caller should do this separately
 }
 
 /*** Runtime API }}} ***/

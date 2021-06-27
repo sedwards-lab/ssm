@@ -34,9 +34,9 @@ extern void initialize_ssm(ssm_time_t);
 extern bool ssm_runtime_alive;
 
 /**
- * Execute the system for the current instant, and returns the next event time.
+ * Execute the system for the current instant.
  */
-extern ssm_time_t tick(void);
+extern void tick(void);
 
 /**
  * Retrieve the head of the queue
