@@ -13,6 +13,7 @@ fib
 fib2
 fib3
 onetwo*
+simpleadd
 
 # Linker output
 *.ilk
