@@ -143,6 +143,7 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
+  initialize_time_driver();
   initialize_io();
 
   struct act top = {.step = top_return};
