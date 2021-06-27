@@ -1,5 +1,6 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
+#include "ssm-time-driver.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
 #include <stdio.h>
@@ -126,8 +127,8 @@ void step_main(struct act *act) {
 
     // after 1s a = 10
     // after 2s b = 10
-    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10);
-    a->b.sv.vtable->later(&a->b.sv, now + 2 * TICKS_PER_SECOND, 10);
+    a->a.sv.vtable->later(&a->a.sv, get_now() + TICKS_PER_SECOND, 10);
+    a->b.sv.vtable->later(&a->b.sv, get_now() + 2 * TICKS_PER_SECOND, 10);
 
     act_call(enter_add(act, act->priority, act->depth, PTR_OF_SV(a->a.sv),
                        PTR_OF_SV(a->b.sv), PTR_OF_SV(a->c.sv)));
@@ -146,13 +147,16 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
+  initialize_time_driver();
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
+  tick();
+  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
+       tick(), next = timestep())
     printf("tick: next = %lu\n", next);
 
   return 0;
