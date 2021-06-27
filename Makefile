@@ -1,7 +1,15 @@
 CC = gcc
-CFLAGS = -g -Wall -pedantic # -DDEBUG
 
 TIME_DRIVER ?= simulation
+
+ifeq ($(TIME_DRIVER), linux)
+	CSTANDARD = gnu99
+else
+	CSTANDARD = c99
+endif
+
+CFLAGS = -g -Wall -pedantic -std=$(CSTANDARD) # -DDEBUG
+
 
 EXE = fib fib2 fib3 counter counter2 clock onetwo onetwo-io simpleadd
 obj_EXE = $(foreach e, $(EXE), $(e).o)
