@@ -6,10 +6,10 @@
  * and synthesize type-specific code for per-type implementations exposed by
  * this compilation unit.
  */
-#include <ssm-act.h>        /* for definition of struct act */
-#include <test-ssm-queue.h> /* for testing */
+#include <ssm-act.h> /* for definition of struct act */
 #include <ssm-queue.h>
-#include <ssm-sv.h> /* for definition of struct sv */
+#include <ssm-sv.h>         /* for definition of struct sv */
+#include <test-ssm-queue.h> /* for testing */
 
 /*** Priority queue logic {{{ */
 
@@ -34,39 +34,11 @@ static inline void enqueue(int (*compar)(void *, void *, void *), void *ctx,
   set(queue, hole, to_insert);
 }
 
-/**
- * NOTE: to_insert must not already be in the queue, but queue_len should
- * already be large enough to accommodate new item.
- */
-static inline void fill_hole(int (*compar)(void *, void *, void *), void *ctx,
-                             void *(*get)(void *, idx_t),
-                             void (*set)(void *, idx_t, void *), void *queue,
-                             size_t queue_len, idx_t hole, void *to_insert) {
-
-  /* If to_insert is less than the parent of the hole */
-  if (hole == QUEUE_HEAD || compar(get(queue, hole >> 1), to_insert, ctx) < 0)
-    /* We may need to move hole down, so we check its children */
-    goto percolate_down;
-
-  /* Otherwise, move hole up until reaching somewhere suitable for insertion */
-  for (;;) {
-    idx_t parent = hole >> 1;
-
-    if (compar(get(queue, parent), to_insert, ctx) <= 0)
-      break;
-
-    set(queue, hole, get(queue, parent));
-    hole = parent;
-
-    /* No more parents to check; insert at root of heap */
-    if (hole == QUEUE_HEAD)
-      break;
-  }
-
-  set(queue, hole, to_insert);
-  return;
-
-percolate_down:
+static inline void percolate_down(int (*compar)(void *, void *, void *),
+                                  void *ctx, void *(*get)(void *, idx_t),
+                                  void (*set)(void *, idx_t, void *),
+                                  void *queue, size_t queue_len, idx_t hole,
+                                  void *to_insert) {
   for (;;) {
     /* Find earlier of hole's two children */
     idx_t child = hole << 1; /* Left child */
@@ -91,6 +63,46 @@ percolate_down:
   }
   set(queue, hole, to_insert);
   return;
+}
+
+static inline void percolate_up(int (*compar)(void *, void *, void *),
+                                void *ctx, void *(*get)(void *, idx_t),
+                                void (*set)(void *, idx_t, void *), void *queue,
+                                size_t queue_len, idx_t hole, void *to_insert) {
+  for (;;) {
+    idx_t parent = hole >> 1;
+
+    if (compar(get(queue, parent), to_insert, ctx) <= 0)
+      break;
+
+    set(queue, hole, get(queue, parent));
+    hole = parent;
+
+    /* No more parents to check; insert at root of heap */
+    if (hole == QUEUE_HEAD)
+      break;
+  }
+
+  set(queue, hole, to_insert);
+  return;
+}
+
+/**
+ * NOTE: to_insert must not already be in the queue, but queue_len should
+ * already be large enough to accommodate new item.
+ */
+static inline void fill_hole(int (*compar)(void *, void *, void *), void *ctx,
+                             void *(*get)(void *, idx_t),
+                             void (*set)(void *, idx_t, void *), void *queue,
+                             size_t queue_len, idx_t hole, void *to_insert) {
+
+  /* If to_insert is less than the parent of the hole */
+  if (hole == QUEUE_HEAD || compar(get(queue, hole >> 1), to_insert, ctx) < 0)
+    /* We may need to percolate hole down, so we check its children */
+    percolate_down(compar, ctx, get, set, queue, queue_len, hole, to_insert);
+  else
+    /* Otherwise, move hole up to find somewhere suitable for insertion */
+    percolate_up(compar, ctx, get, set, queue, queue_len, hole, to_insert);
 }
 
 /*** Priority queue logic }}} */
