@@ -12,11 +12,23 @@
  * The number of iterations and the seed for the randomness can be controlled
  * by command line parameters (see main).
  */
-#include "ssm-queue-test.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+
+#include <test-ssm-queue.h>
+
+#define LOG(...) printf("[test-ssm-queue]: " __VA_ARGS__)
+
+#ifdef DEBUG
+#define DBG(stmt) stmt
+#else
+#define DBG(stmt)                                                              \
+  do {                                                                         \
+  } while (0)
+#endif
 
 /**
  * Tests are written monadically; each function returns an integer indicating
@@ -35,14 +47,6 @@
  * Repeatedly evaluated rhs to choose a value for lhs that isn't MAGIC_VAL.
  */
 #define choose(lhs, rhs) for ((lhs) = (rhs); (lhs) == MAGIC_VAL; (lhs) = (rhs))
-
-#ifdef DEBUG
-#define DBG(stmt) stmt
-#else
-#define DBG(stmt)                                                              \
-  do {                                                                         \
-  } while (0)
-#endif
 
 /**
  * Print the contents of a 1-indexed integer array.
@@ -426,16 +430,36 @@ err:
 /**
  * Test heap sort up for all array sequences up to the given bound.
  */
-int test_heap_sort(unsigned int bound) {
-  for (int i = 1; i < bound; i++)
-    test_heap_sort_seq(i);
-  return 0;
+int test_heap_sort(size_t bound) {
+  LOG("--------------------\n");
+  LOG("Test: test_heap_sort\n");
+  LOG("Testing heap sort for all integer sequences up to size %lu\n", bound);
+
+  for (size_t i = 1; i < bound; i++)
+    if (test_heap_sort_seq(i) == OK)
+      LOG("test_heap_sort succeeded for integer sequence of size %lu\n", i);
+    else
+      goto failed;
+
+  LOG("test_heap_sort passed.\n");
+  LOG("----------------------\n");
+  return OK;
+
+failed:
+  LOG("test_heap_sort failed.\n");
+  LOG("----------------------\n");
+  return ERR;
 }
 
 /**
  * Create a random array, heapify it, and subject it to random heap operations.
  */
 int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
+  LOG("----------------\n");
+  LOG("Test: test_chaos\n");
+  LOG("Testing that random heap maintains invariants\n");
+  LOG("    max length: %lu, iterations: %lu, seed: %u\n", max_len, iters, seed);
+
   srand(seed);
 
   long *a = malloc((max_len + 1) * sizeof(long));
@@ -456,7 +480,7 @@ int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
   heapify(a);
 
   while (iters--) {
-    DBG(printf("test_chaos: iteration %d\n", iters));
+    DBG(printf("test_chaos: iteration %ld\n", iters));
   retry:
     switch (rand() % 3) {
     case 0: {
@@ -468,6 +492,7 @@ int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
 
       if (enqueue(a, x) != OK)
         goto err;
+
       break;
     }
     case 1: {
@@ -479,6 +504,7 @@ int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
 
       if (dequeue(a, idx) != OK)
         goto err;
+
       break;
     }
     default: {
@@ -501,11 +527,14 @@ int test_chaos(const size_t max_len, size_t iters, const unsigned int seed) {
     }
   }
 
+  LOG("test_chaos passed.\n");
+  LOG("------------------\n");
   free(a);
   return OK;
 
 err:
-  printf("context: test_chaos\n");
+  LOG("test_chaos failed.\n");
+  LOG("------------------\n");
   free(a);
   return ERR;
 }
@@ -520,7 +549,7 @@ int main(int argc, char **argv) {
   test_heap_sort(128);
 
   size_t iters = 1000;
-  size_t seed = 42;
+  size_t seed = time(NULL);
 
   if (argc > 1 && atoi(argv[1]) != 0)
     iters = atoi(argv[1]);
