@@ -13,8 +13,6 @@
 #include <ssm-core.h>
 #include <ssm-debug.h>
 
-struct act;
-
 /** Type of a step function */
 typedef void stepf_t(struct act *);
 
