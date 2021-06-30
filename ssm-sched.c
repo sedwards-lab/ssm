@@ -25,7 +25,7 @@ static size_t event_queue_len = 0;
  *
  * Managed as a binary heap sorted by a->priority, implemented in ssm-queue.c.
  */
-struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
+static struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
 size_t act_queue_len = 0;
 
 /**
