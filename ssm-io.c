@@ -1,6 +1,6 @@
 /**
- * Implementation of SSM's IO interface -- a doubly linked list representing
- * the system's file descriptor table.
+ * Linux implementation of SSM's IO interface -- a doubly linked list
+ * representing the system's file descriptor table.
  */
 
 #include <string.h>
@@ -10,8 +10,10 @@
 
 #include "ssm-io.h"
 
+struct io_read_svt io_vars[MAX_IO_VARS];
+
 void initialize_io() {
-  struct io_read_svt *stdin_v = &io_vars[0];
+  struct io_read_svt *stdin_v = &io_vars[STDIN_FILENO];
   initialize_event(&stdin_v->u8_sv.sv, &u8_vtable);
   stdin_v->fd = STDIN_FILENO;
   stdin_v->file_name = "stdio";
@@ -42,7 +44,7 @@ struct io_read_svt *open_io_var(const char *file_name) {
 }
 
 u8_svt *get_stdin_var() {
-  return &io_vars[0].u8_sv;
+  return &io_vars[STDIN_FILENO].u8_sv;
 }
 
 void close_io_var(struct io_read_svt *v) {

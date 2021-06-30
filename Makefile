@@ -3,6 +3,7 @@ CC = gcc
 TIME_DRIVER ?= simulation
 
 ifeq ($(TIME_DRIVER), linux)
+	# nanosleep used in time driver is a GNU C extension.
 	CSTANDARD = gnu99
 else
 	CSTANDARD = c99

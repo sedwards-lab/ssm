@@ -19,7 +19,7 @@ struct io_read_svt {
  * Our representation of the file descriptor table.
  */
 #define MAX_IO_VARS 256
-struct io_read_svt io_vars[MAX_IO_VARS];
+extern struct io_read_svt io_vars[MAX_IO_VARS];
 
 /**
  * Initialize file descriptor table and prepopulate stdin.
