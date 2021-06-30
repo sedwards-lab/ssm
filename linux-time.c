@@ -69,6 +69,9 @@ ssm_time_t timestep() {
   ssm_time_t next = event_head ? event_head->later_time
                                : NO_EVENT_SCHEDULED;
   fd_set read_fds;
+
+  // Check if there are any open files to select on. If so, keep track of the
+  // one with the largest fd number to pass to select.
   FD_ZERO(&read_fds);
   int max_fd = -1;
   for (int i = 0; i < MAX_IO_VARS; i++) {
@@ -81,6 +84,9 @@ ssm_time_t timestep() {
 
   ssm_time_t now = get_now();
   if (next != NO_EVENT_SCHEDULED) {
+    // If there is an event scheduled, calculate our drift from ssm time (i.e.
+    // time spent since last tick) and subtract it from the time difference
+    // between the next event and now.
     time_t secs = (next - now) / 1000000;
     long ns = ((next - now) % 1000000) * 1000;
 
@@ -99,11 +105,16 @@ ssm_time_t timestep() {
                   &ssm_sleep_dur_adjusted);
 
     if (max_fd == -1) {
-      // No fds to block on
-      if (!running_behind)
+      // No files to selct on
+      if (!running_behind) {
+        // If we're not running behind schedule, let's sleep to sync with ssm
+        // time.
         nanosleep(&ssm_sleep_dur_adjusted, NULL);
+      }
     } else {
-      // Block on fds
+      // Select on any open files.
+      // Immediately wake up if we're running behind schedule (this will ensure
+      // that we don't skip real-time io events.
       struct timespec *timeout = (running_behind ? &instant_timeout
                                                  : &ssm_sleep_dur_adjusted);
       int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, timeout, NULL);
@@ -111,7 +122,7 @@ ssm_time_t timestep() {
         perror("pselect");
         exit(1);
       } else if (ret) {
-        // Calculate current time and enqueue events for ready fds
+        // Calculate current time and enqueue events for ready fds.
         clock_gettime(CLOCK_MONOTONIC, &system_time);
         struct timespec remaining_sleep_time;
         timespec_diff(&expected_system_time_next, &system_time, &remaining_sleep_time);
@@ -129,7 +140,7 @@ ssm_time_t timestep() {
       }
     }
   } else {
-    // No events scheduled, but check if any io to block on
+    // No events scheduled, but check if any files to select on.
     if (ssm_runtime_alive && max_fd != -1) {
       int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, NULL, NULL);
       if (ret < 0) {
@@ -137,7 +148,7 @@ ssm_time_t timestep() {
           exit(1);
       }
 
-      // Calculate current time and enqueue events for ready fds
+      // Calculate current time and enqueue events for ready fds.
       struct timespec old_system_time = system_time;
       clock_gettime(CLOCK_MONOTONIC, &system_time);
       struct timespec delta_last_tick;
