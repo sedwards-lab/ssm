@@ -28,12 +28,6 @@
 extern void initialize_ssm(ssm_time_t);
 
 /**
- * Flag to indicate that the ssm system is still alive. Set to false once
- * all routines complete.
- */
-extern bool ssm_runtime_alive;
-
-/**
  * Execute the system for the current instant.
  */
 extern void tick(void);
@@ -48,6 +42,13 @@ extern const struct sv *peek_event_queue();
  */
 extern ssm_time_t get_now();
 extern void set_now(ssm_time_t);
+
+/**
+ * Getter and setter for ssm's runtime completion state. Should be set by the
+ * runtime once the main routine exits.
+ */
+bool ssm_is_complete();
+void ssm_mark_complete();
 
 /**
  * File descriptor table, used for blocking between scheduled events.

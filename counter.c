@@ -317,6 +317,7 @@ void step_main(struct act *act) {
     return;
   case 1:
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
   assert(0);

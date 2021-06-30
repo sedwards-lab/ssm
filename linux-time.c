@@ -84,6 +84,10 @@ ssm_time_t timestep() {
 
   ssm_time_t now = get_now();
   if (next != NO_EVENT_SCHEDULED) {
+    // The runtime system should not have been marked as completed if there are
+    // still events in the queue.
+    assert(!ssm_is_complete());
+
     // If there is an event scheduled, calculate our drift from ssm time (i.e.
     // time spent since last tick) and subtract it from the time difference
     // between the next event and now.
@@ -140,8 +144,9 @@ ssm_time_t timestep() {
       }
     }
   } else {
-    // No events scheduled, but check if any files to select on.
-    if (ssm_runtime_alive && max_fd != -1) {
+    // No events scheduled and the system still hasn't been marked as completed.
+    // Check if any files open to select on.
+    if (!ssm_is_complete() && max_fd != -1) {
       int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, NULL, NULL);
       if (ret < 0) {
           perror("pselect");

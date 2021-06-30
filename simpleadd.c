@@ -139,6 +139,7 @@ void step_main(struct act *act) {
   case 1:
     printf("c = %d\n", a->c.value);
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
 }

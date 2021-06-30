@@ -156,6 +156,7 @@ void step_fib(struct act *act) {
   }
   case 1:
     act_leave(act, sizeof(act_fib_t));
+    ssm_mark_complete();
     return;
   }
 }

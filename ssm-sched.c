@@ -30,11 +30,10 @@ size_t act_queue_len = 0;
 
 /**
  * Note that this starts out uninitialized. It is the responsibility of the
- * runtime to do so.
+ * runtime to do so. Set to NO_EVENT_SCHEDULED to indicate that the runtime has
+ * completed.
  */
 static ssm_time_t now;
-
-bool ssm_runtime_alive;
 
 /*** Internal helpers {{{ ***/
 
@@ -201,6 +200,9 @@ const struct sv *peek_event_queue() {
 ssm_time_t get_now() { return now; }
 
 void set_now(ssm_time_t n) { now = n; }
+
+void ssm_mark_complete() { set_now(NO_EVENT_SCHEDULED); }
+bool ssm_is_complete() { return get_now() == NO_EVENT_SCHEDULED; }
 
 void tick() {
 #ifdef DEBUG
