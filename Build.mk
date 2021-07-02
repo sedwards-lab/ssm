@@ -6,6 +6,14 @@
 CPPFLAGS += -I $(RUNTIMEDIR)/include
 LDLIBS += -lssm
 
+ifdef ACT_QUEUE_SIZE
+CPPFLAGS += -DACT_QUEUE_SIZE=$(ACT_QUEUE_SIZE)
+endif
+
+ifdef EVENT_QUEUE_SIZE
+CPPFLAGS += -DEVENT_QUEUE_SIZE=$(EVENT_QUEUE_SIZE)
+endif
+
 vpath %.c $(RUNTIMEDIR)/src
 vpath %.c $(RUNTIMEDIR)/test
 

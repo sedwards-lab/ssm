@@ -8,8 +8,17 @@
 #include <ssm-runtime.h>
 #include <ssm-sv.h>
 
-#define ACT_QUEUE_SIZE 128
+#ifndef EVENT_QUEUE_SIZE
 #define EVENT_QUEUE_SIZE 256
+#elif EVENT_QUEUE_SIZE < 2
+#error EVENT_QUEUE_SIZE < 2, use larger size
+#endif
+
+#ifndef ACT_QUEUE_SIZE
+#define ACT_QUEUE_SIZE 128
+#elif ACT_QUEUE_SIZE < 2
+#error ACT_QUEUE_SIZE < 2, use larger size
+#endif
 
 /**
  * Event queue, used to track and schedule events between instants.
