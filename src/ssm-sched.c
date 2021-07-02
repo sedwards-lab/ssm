@@ -9,13 +9,13 @@
 #include <ssm-sv.h>
 
 #ifndef EVENT_QUEUE_SIZE
-#define EVENT_QUEUE_SIZE 256
+#define EVENT_QUEUE_SIZE 2048
 #elif EVENT_QUEUE_SIZE < 2
 #error EVENT_QUEUE_SIZE < 2, use larger size
 #endif
 
 #ifndef ACT_QUEUE_SIZE
-#define ACT_QUEUE_SIZE 128
+#define ACT_QUEUE_SIZE 1024
 #elif ACT_QUEUE_SIZE < 2
 #error ACT_QUEUE_SIZE < 2, use larger size
 #endif
