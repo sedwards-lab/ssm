@@ -124,11 +124,13 @@ void initialize_event(struct sv *sv) {
 }
 
 void unsched_event(struct sv *sv) {
-  idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
-  assert(QUEUE_HEAD <= idx);
-  assert(sv->later_time != NO_EVENT_SCHEDULED);
-  sv->later_time = NO_EVENT_SCHEDULED;
-  dequeue_event(event_queue, &event_queue_len, idx);
+  if(sv->later_time != NO_EVENT_SCHEDULED) {
+    idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
+    assert(QUEUE_HEAD <= idx);
+    assert(sv->later_time != NO_EVENT_SCHEDULED);
+    sv->later_time = NO_EVENT_SCHEDULED;
+    dequeue_event(event_queue, &event_queue_len, idx);
+  }
 }
 
 void assign_event(struct sv *sv, priority_t prio) {
