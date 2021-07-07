@@ -98,9 +98,9 @@ static void update_event(struct sv *sv) {
   sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
 
-  schedule_all_sensitive_triggers(sv);
   DEBUG_PRINT("event %lu value %s %s\n", now, DEBUG_SV_GET_TYPE_NAME(sv->debug),
               DEBUG_SV_GET_VALUE_REPR(sv->debug, sv));
+  schedule_all_sensitive_triggers(sv);
 }
 
 /*** Internal helpers }}} ***/
