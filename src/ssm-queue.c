@@ -216,7 +216,7 @@ void requeue_act(struct act **act_queue, size_t *queue_len, idx_t to_requeue) {
 
 idx_t index_of_act(struct act **act_queue, size_t *queue_len,
                    struct act *to_find) {
-  for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
+  for (idx_t idx = QUEUE_HEAD; idx <= *queue_len; idx++)
     if (act_queue[idx] == to_find)
       return idx;
   return 0;
