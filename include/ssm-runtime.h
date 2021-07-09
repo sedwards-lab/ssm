@@ -24,6 +24,10 @@
 extern void tick(void);
 
 /**
+ * Get the current time.
+ */
+extern ssm_time_t get_now(void);
+/**
  * Set the current time.
  */
 extern void set_now(ssm_time_t);

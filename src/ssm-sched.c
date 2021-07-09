@@ -205,6 +205,7 @@ ssm_time_t next_event_time(void) {
                          : NO_EVENT_SCHEDULED;
 }
 
+ssm_time_t get_now(void) { return now; }
 void set_now(ssm_time_t t) { now = t; }
 
 void tick() {
