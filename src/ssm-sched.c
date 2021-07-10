@@ -98,9 +98,9 @@ static void update_event(struct sv *sv) {
   sv->last_updated = now;
   sv->later_time = NO_EVENT_SCHEDULED;
 
-  schedule_all_sensitive_triggers(sv);
   DEBUG_PRINT("event %lu value %s %s\n", now, DEBUG_SV_GET_TYPE_NAME(sv->debug),
               DEBUG_SV_GET_VALUE_REPR(sv->debug, sv));
+  schedule_all_sensitive_triggers(sv);
 }
 
 /*** Internal helpers }}} ***/
@@ -124,11 +124,12 @@ void initialize_event(struct sv *sv) {
 }
 
 void unsched_event(struct sv *sv) {
-  idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
-  assert(QUEUE_HEAD <= idx);
-  assert(sv->later_time != NO_EVENT_SCHEDULED);
-  sv->later_time = NO_EVENT_SCHEDULED;
-  dequeue_event(event_queue, &event_queue_len, idx);
+  if(sv->later_time != NO_EVENT_SCHEDULED) {
+    idx_t idx = index_of_event(event_queue, &event_queue_len, sv);
+    assert(QUEUE_HEAD <= idx);
+    sv->later_time = NO_EVENT_SCHEDULED;
+    dequeue_event(event_queue, &event_queue_len, idx);
+  }
 }
 
 void assign_event(struct sv *sv, priority_t prio) {

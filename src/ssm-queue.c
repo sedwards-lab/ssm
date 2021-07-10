@@ -157,7 +157,10 @@ void requeue_event(struct sv **event_queue, size_t *queue_len,
 
 idx_t index_of_event(struct sv **event_queue, size_t *queue_len,
                      struct sv *to_find) {
-  for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
+  //if(*queue_len == 1 && event_queue[QUEUE_HEAD] == to_find) {
+  //  return 1;
+  //} // which fix does John prefer?
+  for (idx_t idx = QUEUE_HEAD; idx <= *queue_len; idx++)
     if (event_queue[idx] == to_find)
       return idx;
   return 0;
@@ -213,7 +216,7 @@ void requeue_act(struct act **act_queue, size_t *queue_len, idx_t to_requeue) {
 
 idx_t index_of_act(struct act **act_queue, size_t *queue_len,
                    struct act *to_find) {
-  for (idx_t idx = QUEUE_HEAD; idx < *queue_len; idx++)
+  for (idx_t idx = QUEUE_HEAD; idx <= *queue_len; idx++)
     if (act_queue[idx] == to_find)
       return idx;
   return 0;
