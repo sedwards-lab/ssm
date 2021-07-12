@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
-  initialize_time_driver();
+  initialize_time_driver(0);
   tick();
   timestep();
 

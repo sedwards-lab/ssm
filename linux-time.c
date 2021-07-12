@@ -1,6 +1,6 @@
 /**
- * Implementation of a linux time driver, which uses nanosleep to progress time
- * between events.
+ * Implementation of a linux time driver, which uses nanosleep/pselect to
+ * progress time between events.
  */
 
 #include <stdio.h>
@@ -16,7 +16,8 @@
 /**
  * Timestamp of the last tick in the runtime.
  */
-static struct timespec system_time;
+static struct timespec ssm_offset;
+static bool offset_is_positive;
 
 /*** Timespec helpers {{{ ***/
 
@@ -56,44 +57,73 @@ static inline bool timespec_lt(struct timespec *a, struct timespec *b) {
         return a->tv_sec < b->tv_sec;
 }
 
+/**
+ * Convert from ssm time to system time.
+ */
+static inline void ssm_to_sys_time(ssm_time_t ssm_time, struct timespec *ts) {
+  struct timespec ssm_ts;
+  ssm_ts.tv_sec = ssm_time / 100000;
+  ssm_ts.tv_nsec = (ssm_time % 1000000) * 1000;
+
+  if (offset_is_positive)
+    timespec_add(&ssm_ts, &ssm_offset, ts);
+  else
+    timespec_diff(&ssm_ts, &ssm_offset, ts);
+}
+
+/**
+ * Convert from system time to ssm time.
+ */
+static inline ssm_time_t sys_to_ssm_time(struct timespec *ts) {
+  struct timespec ssm_ts;
+
+  if (offset_is_positive)
+    timespec_diff(ts, &ssm_offset, &ssm_ts);
+  else
+    timespec_add(ts, &ssm_offset, &ssm_ts);
+
+  return ssm_ts.tv_sec * 1000000 + ssm_ts.tv_nsec / 1000;
+}
+
 /*** Timespec helpers }}} ***/
 
 /*** Time driver API, exposed via time-driver.h {{{ ***/
 
-void initialize_time_driver() {
-  clock_gettime(CLOCK_MONOTONIC, &system_time);
+void initialize_time_driver(ssm_time_t epoch) {
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+
+  struct timespec epoch_ts = { .tv_sec = epoch / 100000,
+                               .tv_nsec = (epoch % 1000000) * 1000 };
+
+  offset_is_positive = timespec_lt(&epoch_ts, &now);
+  if (offset_is_positive)
+    timespec_diff(&now, &epoch_ts, &ssm_offset);
+  else
+    timespec_diff(&epoch_ts, &now, &ssm_offset);
+
 }
 
 void timestep() {
   const struct sv *event_head = peek_event_queue();
   ssm_time_t next = event_head ? event_head->later_time
                                : NO_EVENT_SCHEDULED;
-
-  ssm_time_t now = get_now();
+  struct timespec current_time;
   if (next != NO_EVENT_SCHEDULED) {
     // The runtime system should not have been marked as completed if there are
     // still events in the queue.
     assert(!ssm_is_complete());
 
-    // If there is an event scheduled, calculate our drift from ssm time (i.e.
-    // time spent since last tick) and subtract it from the time difference
-    // between the next event and now.
-    time_t secs = (next - now) / 1000000;
-    long ns = ((next - now) % 1000000) * 1000;
+    // If there is an event scheduled, account for our drift from ssm time (i.e.
+    // time spent since last tick).
+    struct timespec next_ts;
+    ssm_to_sys_time(next, &next_ts);
 
-    struct timespec ssm_sleep_dur = { secs, ns };
-
-    struct timespec expected_system_time_next;
-    timespec_add(&system_time, &ssm_sleep_dur, &expected_system_time_next);
-
-    clock_gettime(CLOCK_MONOTONIC, &system_time);
-
-    bool running_behind = !timespec_lt(&system_time, &expected_system_time_next);
-    struct timespec instant_timeout = {0 , 0};
+    clock_gettime(CLOCK_MONOTONIC, &current_time);
+    bool running_behind = !timespec_lt(&current_time, &next_ts);
 
     struct timespec ssm_sleep_dur_adjusted;
-    timespec_diff(&expected_system_time_next, &system_time,
-                  &ssm_sleep_dur_adjusted);
+    timespec_diff(&next_ts, &current_time, &ssm_sleep_dur_adjusted);
 
     if (ssm_max_fd == -1) {
       // No files to select on.
@@ -109,6 +139,7 @@ void timestep() {
 
       // Snapshot since fd_set gets modfied in pselect().
       fd_set ssm_read_fds_copy = ssm_read_fds;
+      struct timespec instant_timeout = {0 , 0};
       struct timespec *timeout = (running_behind ? &instant_timeout
                                                  : &ssm_sleep_dur_adjusted);
       int ret = pselect(ssm_max_fd + 1, &ssm_read_fds, NULL, NULL, timeout, NULL);
@@ -117,21 +148,18 @@ void timestep() {
         exit(1);
       } else if (ret) {
         // Calculate current time and enqueue events for ready fds.
-        clock_gettime(CLOCK_MONOTONIC, &system_time);
-        struct timespec remaining_sleep_time;
-        timespec_diff(&expected_system_time_next, &system_time, &remaining_sleep_time);
-        next -= ((remaining_sleep_time.tv_sec * 1000000)
-                 + (remaining_sleep_time.tv_nsec / 1000));
-        for (int i = 0; i <= ssm_max_fd; i++) { // iterate to max_fd?
+        clock_gettime(CLOCK_MONOTONIC, &current_time);
+        ssm_time_t ssm_io_event_time = sys_to_ssm_time(&current_time);
+        for (int i = 0; i <= ssm_max_fd; i++) {
           struct io_read_svt *io_sv = io_vars + i;
           if (FD_ISSET(io_sv->fd, &ssm_read_fds)) {
             read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
-            later_event(&io_sv->u8_sv.sv, next);
+            later_event(&io_sv->u8_sv.sv, ssm_io_event_time);
           }
         }
-        // Restore our fd_set.
-        ssm_read_fds = ssm_read_fds_copy;
       }
+      // Restore our fd_set.
+      ssm_read_fds = ssm_read_fds_copy;
     }
   } else {
     // No events scheduled and the system still hasn't been marked as completed.
@@ -146,17 +174,13 @@ void timestep() {
       }
 
       // Calculate current time and enqueue events for ready fds.
-      struct timespec old_system_time = system_time;
-      clock_gettime(CLOCK_MONOTONIC, &system_time);
-      struct timespec delta_last_tick;
-      timespec_diff(&system_time, &old_system_time, &delta_last_tick);
-      next = (now + (delta_last_tick.tv_sec * 1000000)
-              + (delta_last_tick.tv_nsec / 1000));
+      clock_gettime(CLOCK_MONOTONIC, &current_time);
+      ssm_time_t ssm_io_event_time = sys_to_ssm_time(&current_time);
       for (int i = 0; i <= ssm_max_fd; i++) {
         struct io_read_svt *io_sv = io_vars + i;
         if (FD_ISSET(io_sv->fd, &ssm_read_fds)) {
           read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
-          later_event(&io_sv->u8_sv.sv, next);
+          later_event(&io_sv->u8_sv.sv, ssm_io_event_time);
         }
       }
       // Restore our fd_set.
@@ -164,7 +188,6 @@ void timestep() {
     }
   }
 
-  clock_gettime(CLOCK_MONOTONIC, &system_time);
 }
 
 /*** Time driver API, exposed via time-driver.h }}} ***/

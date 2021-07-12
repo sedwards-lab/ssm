@@ -329,7 +329,7 @@ int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
 
   initialize_ssm(0);
-  initialize_time_driver();
+  initialize_time_driver(0);
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");

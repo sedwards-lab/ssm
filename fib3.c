@@ -178,7 +178,7 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
-  initialize_time_driver();
+  initialize_time_driver(0);
 
   for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick()) {
     printf("get_now() %lu\n", next);

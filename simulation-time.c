@@ -11,7 +11,7 @@
 
 /*** Time driver API, exposed via time-driver.h {{{ ***/
 
-void initialize_time_driver() {
+void initialize_time_driver(ssm_time_t epoch) {
   // No-op
 }
 

@@ -14,7 +14,7 @@
  *
  * This should only be called once, after initializing the ssm runtime.
  */
-extern void initialize_time_driver();
+extern void initialize_time_driver(ssm_time_t epoch);
 
 /**
  * Progress the system to the next event time and handles io.
