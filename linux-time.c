@@ -14,7 +14,7 @@
 #include "ssm-time-driver.h"
 
 /**
- * Timestamp of the last tick in the runtime.
+ * Conversion between ssm time and system time.
  */
 static struct timespec ssm_offset;
 static bool offset_is_positive;
