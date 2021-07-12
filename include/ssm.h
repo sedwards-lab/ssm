@@ -478,9 +478,4 @@ SSM_DECLARE_SV_SCALAR(u64)
 
 /** @} */
 
-
-// FIXME!
-#include "ssm-debug.h"
-
 #endif
-
