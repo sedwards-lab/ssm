@@ -159,9 +159,7 @@ int main() {
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  tick();
-  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
-       tick(), next = timestep()) {
+  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick()) {
     printf("tick: next %lu\n", next);
   }
 

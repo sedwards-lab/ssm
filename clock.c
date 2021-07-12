@@ -196,9 +196,8 @@ int main(int argc, char *argv[]) {
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 
-  tick();
-  for (ssm_time_t next = timestep(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, tick(), next = timestep()) {
+  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
+       stop_at--, next = tick()) {
     printf("next %lu\n", next);
   }
 

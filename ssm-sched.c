@@ -7,6 +7,7 @@
 #include "ssm-queue.h"
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
+#include "ssm-time-driver.h"
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
@@ -204,7 +205,7 @@ void set_now(ssm_time_t n) { now = n; }
 void ssm_mark_complete() { set_now(NO_EVENT_SCHEDULED); }
 bool ssm_is_complete() { return get_now() == NO_EVENT_SCHEDULED; }
 
-void tick() {
+ssm_time_t tick() {
 #ifdef DEBUG
   printf("tick called. event_queue_len: %lu\n", event_queue_len);
 #endif
@@ -250,6 +251,12 @@ void tick() {
 #endif
     to_run->step(to_run);
   }
+
+  timestep();
+  const struct sv *event_head = peek_event_queue();
+  set_now(event_head ? event_head->later_time : NO_EVENT_SCHEDULED);
+
+  return get_now();
 }
 
 /*** Runtime API }}} ***/

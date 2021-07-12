@@ -64,7 +64,7 @@ void initialize_time_driver() {
   clock_gettime(CLOCK_MONOTONIC, &system_time);
 }
 
-ssm_time_t timestep() {
+void timestep() {
   const struct sv *event_head = peek_event_queue();
   ssm_time_t next = event_head ? event_head->later_time
                                : NO_EVENT_SCHEDULED;
@@ -164,10 +164,7 @@ ssm_time_t timestep() {
     }
   }
 
-  set_now(next); // Only tick() should update now
   clock_gettime(CLOCK_MONOTONIC, &system_time);
-
-  return next;
 }
 
 /*** Time driver API, exposed via time-driver.h }}} ***/

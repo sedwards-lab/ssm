@@ -37,6 +37,7 @@ typedef struct {
 
 typedef struct {
   struct act act;
+  ptr_u8_svt stdin_sv;
 } act_main_t;
 
 stepf_t step_one;
@@ -110,27 +111,29 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
       act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
   DEBUG_ACT_NAME(act, "main");
 
+  act_main_t *ac = container_of(act, act_main_t, act);
+  ac->stdin_sv = PTR_OF_SV(get_stdin_var()->sv);
+
   return act;
 }
 
 void step_main(struct act *act) {
-  u8_svt *stdin_sv = get_stdin_var(); // Move to enter_main
-
+  act_main_t *a = container_of(act, act_main_t, act);
   switch (act->pc) {
   case 0: {
     depth_t new_depth = act->depth - 1; /* 2 children */
     priority_t new_priority = act->priority;
     priority_t pinc = 1 << new_depth;
 
-    act_fork(enter_one(act, new_priority, new_depth, PTR_OF_SV(stdin_sv->sv)));
+    act_fork(enter_one(act, new_priority, new_depth, a->stdin_sv));
     new_priority += pinc;
 
-    act_fork(enter_two(act, new_priority, new_depth, PTR_OF_SV(stdin_sv->sv)));
+    act_fork(enter_two(act, new_priority, new_depth, a->stdin_sv));
     act->pc = 1;
     return;
   }
   case 1: {
-    printf("a = %d\n", stdin_sv->value);
+    printf("a = %d\n", *DEREF(uint8_t, a->stdin_sv));
     act_leave(act, sizeof(act_main_t));
     ssm_mark_complete();
     return;
@@ -150,9 +153,7 @@ int main() {
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  tick();
-  for (ssm_time_t next = timestep(); next != NO_EVENT_SCHEDULED;
-       tick(), next = timestep())
+  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
     printf("tick: next = %lu\n", next);
 
   deinitialize_io();

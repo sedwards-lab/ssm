@@ -1,6 +1,8 @@
 #ifndef _SSM_IO_H
 #define _SSM_IO_H
 
+#include <sys/select.h>
+
 #include "ssm-types.h"
 #include "ssm-debug.h"
 

@@ -17,8 +17,8 @@
 extern void initialize_time_driver();
 
 /**
- * Progress the system to the next event time and return that time value.
+ * Progress the system to the next event time and handles io.
  */
-extern ssm_time_t timestep();
+extern void timestep();
 
 #endif /* ifndef __SSM_TIME_DRIVER_H */
