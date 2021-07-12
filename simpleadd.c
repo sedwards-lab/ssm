@@ -1,5 +1,6 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
+#include "ssm-time-driver.h"
 #include "ssm-runtime.h"
 #include "ssm-types.h"
 #include <stdio.h>
@@ -126,8 +127,8 @@ void step_main(struct act *act) {
 
     // after 1s a = 10
     // after 2s b = 10
-    a->a.sv.vtable->later(&a->a.sv, now + TICKS_PER_SECOND, 10);
-    a->b.sv.vtable->later(&a->b.sv, now + 2 * TICKS_PER_SECOND, 10);
+    a->a.sv.vtable->later(&a->a.sv, get_now() + TICKS_PER_SECOND, 10);
+    a->b.sv.vtable->later(&a->b.sv, get_now() + 2 * TICKS_PER_SECOND, 10);
 
     act_call(enter_add(act, act->priority, act->depth, PTR_OF_SV(a->a.sv),
                        PTR_OF_SV(a->b.sv), PTR_OF_SV(a->c.sv)));
@@ -138,6 +139,7 @@ void step_main(struct act *act) {
   case 1:
     printf("c = %d\n", a->c.value);
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
 }
@@ -146,6 +148,7 @@ void top_return(struct act *cont) { return; }
 
 int main() {
   initialize_ssm(0);
+  initialize_time_driver(0);
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");

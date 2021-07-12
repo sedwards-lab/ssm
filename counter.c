@@ -35,6 +35,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -117,12 +118,14 @@ void step_clk(struct act *act) {
 
   switch (act->pc) {
   case 0:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 1);
     act->pc = 1;
     return;
 
   case 1:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 0);
     act->pc = 0;
     return;
   }
@@ -314,6 +317,7 @@ void step_main(struct act *act) {
     return;
   case 1:
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
   assert(0);
@@ -325,6 +329,7 @@ int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
 
   initialize_ssm(0);
+  initialize_time_driver(0);
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -333,8 +338,9 @@ int main(int argc, char *argv[]) {
   act_fork(act);
 
   for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick())
-    printf("next %lu\n", now);
+       stop_at--, next = tick()) {
+    printf("next %lu\n", next);
+  }
 
   return 0;
 }

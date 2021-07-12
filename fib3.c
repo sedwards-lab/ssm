@@ -24,6 +24,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -107,7 +108,7 @@ void step_sum(struct act *act) {
     return;
   }
   case 1:
-    PTR_LATER(a->r, now + 1, *DEREF(int, a->r1) + *DEREF(int, a->r2));
+    PTR_LATER(a->r, get_now() + TICKS_PER_SECOND, *DEREF(int, a->r1) + *DEREF(int, a->r2));
     act_leave(act, sizeof(act_sum_t));
     return;
   }
@@ -134,7 +135,7 @@ void step_fib(struct act *act) {
     a->r1.value = 0;
     a->r2.value = 0;
     if (a->n < 2) {
-      PTR_LATER(a->r, now + 1, 1);
+      PTR_LATER(a->r, get_now() + TICKS_PER_SECOND, 1);
       act_leave(act, sizeof(act_fib_t));
       return;
     }
@@ -155,6 +156,7 @@ void step_fib(struct act *act) {
   }
   case 1:
     act_leave(act, sizeof(act_fib_t));
+    ssm_mark_complete();
     return;
   }
 }
@@ -176,8 +178,11 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("now %lu\n", next);
+  initialize_time_driver(0);
+
+  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick()) {
+    printf("get_now() %lu\n", next);
+  }
 
   printf("%d\n", result.value);
   return 0;

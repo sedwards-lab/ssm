@@ -7,6 +7,7 @@
 #include "ssm-queue.h"
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
+#include "ssm-time-driver.h"
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
@@ -16,8 +17,8 @@
  *
  * Managed as a binary heap sorted by e->later_time, implemented in ssm-queue.c.
  */
-struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
-size_t event_queue_len = 0;
+static struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
+static size_t event_queue_len = 0;
 
 /**
  * Activation record queue, used to track and schedule continuations at each
@@ -25,14 +26,15 @@ size_t event_queue_len = 0;
  *
  * Managed as a binary heap sorted by a->priority, implemented in ssm-queue.c.
  */
-struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
+static struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
 size_t act_queue_len = 0;
 
 /**
  * Note that this starts out uninitialized. It is the responsibility of the
- * runtime to do so.
+ * runtime to do so. Set to NO_EVENT_SCHEDULED to indicate that the runtime has
+ * completed.
  */
-ssm_time_t now;
+static ssm_time_t now;
 
 /*** Internal helpers {{{ ***/
 
@@ -188,7 +190,20 @@ void desensitize(struct trigger *trigger) {
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
 
-void initialize_ssm(ssm_time_t start) { now = start; }
+void initialize_ssm(ssm_time_t start) {
+  now = start;
+}
+
+const struct sv *peek_event_queue() {
+  return event_queue_len > 0 ? event_queue[QUEUE_HEAD] : NULL;
+}
+
+ssm_time_t get_now() { return now; }
+
+void set_now(ssm_time_t n) { now = n; }
+
+void ssm_mark_complete() { set_now(NO_EVENT_SCHEDULED); }
+bool ssm_is_complete() { return get_now() == NO_EVENT_SCHEDULED; }
 
 ssm_time_t tick() {
 #ifdef DEBUG
@@ -237,13 +252,11 @@ ssm_time_t tick() {
     to_run->step(to_run);
   }
 
-  /*
-   * FIXME: this interface isn't really usable. We want the runtime driver to be
-   * able to interrupt sooner than now, so that it can respond to I/O etc.
-   */
-  now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                            : NO_EVENT_SCHEDULED;
-  return now;
+  timestep();
+  const struct sv *event_head = peek_event_queue();
+  set_now(event_head ? event_head->later_time : NO_EVENT_SCHEDULED);
+
+  return get_now();
 }
 
 /*** Runtime API }}} ***/

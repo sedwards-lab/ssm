@@ -16,6 +16,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -69,6 +70,7 @@ void step_fib(struct act *act) {
   case 1:
     PTR_ASSIGN(a->r, act->priority, *DEREF(int, a->r) + a->r2.value);
     act_leave(act, sizeof(fib_act_t));
+    ssm_mark_complete();
     return;
   }
   assert(0);
@@ -91,7 +93,9 @@ int main(int argc, char *argv[]) {
                      PTR_OF_SV(result.sv)));
 
   initialize_ssm(0);
+  initialize_time_driver(0);
   tick();
+  timestep();
 
   printf("%d\n", result.value);
 

@@ -24,6 +24,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -73,7 +74,7 @@ void step_second_clock(struct act *act) {
       assign_event(a->second_event.ptr, act->priority); /* seconds = Event */
 
       /* after 1s timer = Event */
-      later_event(&a->timer, now + 1 * TICKS_PER_SECOND);
+      later_event(&a->timer, get_now() + 1 * TICKS_PER_SECOND);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -176,6 +177,7 @@ void step_main(struct act *act) {
     return;
   case 1:
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
 }
@@ -186,6 +188,7 @@ int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 20;
 
   initialize_ssm(0);
+  initialize_time_driver(0);
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -194,8 +197,9 @@ int main(int argc, char *argv[]) {
   act_fork(act);
 
   for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick())
-    printf("next %lu\n", now);
+       stop_at--, next = tick()) {
+    printf("next %lu\n", next);
+  }
 
   return 0;
 }
