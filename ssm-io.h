@@ -22,6 +22,12 @@ struct io_read_svt {
 extern struct io_read_svt io_vars[MAX_IO_VARS];
 
 /**
+ * Globally maintained fd_set for selecting on.
+ */
+extern int ssm_max_fd;
+extern fd_set ssm_read_fds;
+
+/**
  * Initialize file descriptor table and prepopulate stdin.
  */
 void initialize_io();

@@ -114,7 +114,7 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
 }
 
 void step_main(struct act *act) {
-  u8_svt *stdin_sv = get_stdin_var();
+  u8_svt *stdin_sv = get_stdin_var(); // Move to enter_main
 
   switch (act->pc) {
   case 0: {

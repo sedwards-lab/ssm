@@ -68,19 +68,6 @@ ssm_time_t timestep() {
   const struct sv *event_head = peek_event_queue();
   ssm_time_t next = event_head ? event_head->later_time
                                : NO_EVENT_SCHEDULED;
-  fd_set read_fds;
-
-  // Check if there are any open files to select on. If so, keep track of the
-  // one with the largest fd number to pass to select.
-  FD_ZERO(&read_fds);
-  int max_fd = -1;
-  for (int i = 0; i < MAX_IO_VARS; i++) {
-    struct io_read_svt *io_sv = io_vars + i;
-    if (!io_sv->is_open) continue;
-    FD_SET(io_sv->fd, &read_fds);
-    if (io_sv->fd > max_fd)
-      max_fd = io_sv->fd;
-  }
 
   ssm_time_t now = get_now();
   if (next != NO_EVENT_SCHEDULED) {
@@ -108,8 +95,8 @@ ssm_time_t timestep() {
     timespec_diff(&expected_system_time_next, &system_time,
                   &ssm_sleep_dur_adjusted);
 
-    if (max_fd == -1) {
-      // No files to selct on
+    if (ssm_max_fd == -1) {
+      // No files to select on.
       if (!running_behind) {
         // If we're not running behind schedule, let's sleep to sync with ssm
         // time.
@@ -119,9 +106,12 @@ ssm_time_t timestep() {
       // Select on any open files.
       // Immediately wake up if we're running behind schedule (this will ensure
       // that we don't skip real-time io events.
+
+      // Snapshot since fd_set gets modfied in pselect().
+      fd_set ssm_read_fds_copy = ssm_read_fds;
       struct timespec *timeout = (running_behind ? &instant_timeout
                                                  : &ssm_sleep_dur_adjusted);
-      int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, timeout, NULL);
+      int ret = pselect(ssm_max_fd + 1, &ssm_read_fds, NULL, NULL, timeout, NULL);
       if (ret < 0) {
         perror("pselect");
         exit(1);
@@ -132,22 +122,24 @@ ssm_time_t timestep() {
         timespec_diff(&expected_system_time_next, &system_time, &remaining_sleep_time);
         next -= ((remaining_sleep_time.tv_sec * 1000000)
                  + (remaining_sleep_time.tv_nsec / 1000));
-        for (int i = 0; i < MAX_IO_VARS; i++) {
+        for (int i = 0; i <= ssm_max_fd; i++) { // iterate to max_fd?
           struct io_read_svt *io_sv = io_vars + i;
-          if(FD_ISSET(io_sv->fd, &read_fds)) {
+          if (FD_ISSET(io_sv->fd, &ssm_read_fds)) {
             read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
-            if(io_sv->u8_sv.sv.triggers) {
-              later_event(&io_sv->u8_sv.sv, next);
-            }
+            later_event(&io_sv->u8_sv.sv, next);
           }
         }
+        // Restore our fd_set.
+        ssm_read_fds = ssm_read_fds_copy;
       }
     }
   } else {
     // No events scheduled and the system still hasn't been marked as completed.
     // Check if any files open to select on.
-    if (!ssm_is_complete() && max_fd != -1) {
-      int ret = pselect(max_fd + 1, &read_fds, NULL, NULL, NULL, NULL);
+    if (!ssm_is_complete() && ssm_max_fd != -1) {
+      // Snapshot since fd_set gets modfied in pselect().
+      fd_set ssm_read_fds_copy = ssm_read_fds;
+      int ret = pselect(ssm_max_fd + 1, &ssm_read_fds, NULL, NULL, NULL, NULL);
       if (ret < 0) {
           perror("pselect");
           exit(1);
@@ -160,19 +152,19 @@ ssm_time_t timestep() {
       timespec_diff(&system_time, &old_system_time, &delta_last_tick);
       next = (now + (delta_last_tick.tv_sec * 1000000)
               + (delta_last_tick.tv_nsec / 1000));
-      for (int i = 0; i < MAX_IO_VARS; i++) {
+      for (int i = 0; i <= ssm_max_fd; i++) {
         struct io_read_svt *io_sv = io_vars + i;
-        if(io_sv->is_open && FD_ISSET(io_sv->fd, &read_fds)) {
+        if (FD_ISSET(io_sv->fd, &ssm_read_fds)) {
           read(io_sv->fd, &io_sv->u8_sv.later_value, 1);
-          if(io_sv->u8_sv.sv.triggers) {
-            later_event(&io_sv->u8_sv.sv, next);
-          }
+          later_event(&io_sv->u8_sv.sv, next);
         }
       }
+      // Restore our fd_set.
+      ssm_read_fds = ssm_read_fds_copy;
     }
   }
 
-  set_now(next);
+  set_now(next); // Only tick() should update now
   clock_gettime(CLOCK_MONOTONIC, &system_time);
 
   return next;
