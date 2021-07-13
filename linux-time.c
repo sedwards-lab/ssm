@@ -62,7 +62,7 @@ static inline bool timespec_lt(struct timespec *a, struct timespec *b) {
  */
 static inline void ssm_to_sys_time(ssm_time_t ssm_time, struct timespec *ts) {
   struct timespec ssm_ts;
-  ssm_ts.tv_sec = ssm_time / 100000;
+  ssm_ts.tv_sec = ssm_time / 1000000;
   ssm_ts.tv_nsec = (ssm_time % 1000000) * 1000;
 
   if (offset_is_positive)
@@ -93,7 +93,7 @@ void initialize_time_driver(ssm_time_t epoch) {
   struct timespec now;
   clock_gettime(CLOCK_MONOTONIC, &now);
 
-  struct timespec epoch_ts = { .tv_sec = epoch / 100000,
+  struct timespec epoch_ts = { .tv_sec = epoch / 1000000,
                                .tv_nsec = (epoch % 1000000) * 1000 };
 
   offset_is_positive = timespec_lt(&epoch_ts, &now);
@@ -110,10 +110,6 @@ void timestep() {
                                : NO_EVENT_SCHEDULED;
   struct timespec current_time;
   if (next != NO_EVENT_SCHEDULED) {
-    // The runtime system should not have been marked as completed if there are
-    // still events in the queue.
-    assert(!ssm_is_complete());
-
     // If there is an event scheduled, account for our drift from ssm time (i.e.
     // time spent since last tick).
     struct timespec next_ts;

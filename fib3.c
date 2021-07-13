@@ -156,14 +156,16 @@ void step_fib(struct act *act) {
   }
   case 1:
     act_leave(act, sizeof(act_fib_t));
-    ssm_mark_complete();
     return;
   }
 }
 
-void top_return(struct act *cont) { return; }
+void top_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
+  initialize_ssm(0);
+  initialize_time_driver(0);
+
   i32_svt result;
   initialize_event(&result.sv, &i32_vtable);
   DEBUG_SV_NAME(&result.sv, "result");
@@ -177,12 +179,12 @@ int main(int argc, char *argv[]) {
   act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
                      PTR_OF_SV(result.sv)));
 
-  initialize_ssm(0);
-  initialize_time_driver(0);
-
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick()) {
-    printf("get_now() %lu\n", next);
-  }
+  tick();
+  do {
+    printf("now: %lu\n", get_now());
+    timestep();
+    tick();
+  } while (!ssm_is_complete());
 
   printf("%d\n", result.value);
   return 0;

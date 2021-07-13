@@ -28,9 +28,9 @@
 extern void initialize_ssm(ssm_time_t);
 
 /**
- * Execute the system for the current instant and return that time value.
+ * Execute the system for the current instant.
  */
-extern ssm_time_t tick(void);
+extern void tick(void);
 
 /**
  * Retrieve the head of the queue

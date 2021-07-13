@@ -342,12 +342,11 @@ void step_main(struct act *act) {
     return;
   case 1:
     act_leave(act, sizeof(act_adder_t));
-    ssm_mark_complete();
     return;
   }
 }
 
-void main_return(struct act *cont) { return; }
+void main_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
@@ -361,11 +360,12 @@ int main(int argc, char *argv[]) {
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 
-
-  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick()) {
-    printf("next %lu\n", next);
-  }
+  tick();
+  do {
+    printf("now: %lu\n", get_now());
+    timestep();
+    tick();
+  } while (--stop_at > 0 && !ssm_is_complete());
 
   return 0;
 }

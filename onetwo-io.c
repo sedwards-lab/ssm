@@ -135,13 +135,12 @@ void step_main(struct act *act) {
   case 1: {
     printf("a = %d\n", *DEREF(uint8_t, a->stdin_sv));
     act_leave(act, sizeof(act_main_t));
-    ssm_mark_complete();
     return;
   }
   }
 }
 
-void top_return(struct act *cont) { return; }
+void top_return(struct act *cont) { ssm_mark_complete(); }
 
 int main() {
   initialize_ssm(0);
@@ -153,8 +152,12 @@ int main() {
 
   act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT));
 
-  for (ssm_time_t next = tick(); next != NO_EVENT_SCHEDULED; next = tick())
-    printf("tick: next = %lu\n", next);
+  tick();
+  do {
+    printf("now: %lu\n", get_now());
+    timestep();
+    tick();
+  } while (!ssm_is_complete());
 
   deinitialize_io();
   return 0;

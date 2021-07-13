@@ -68,9 +68,10 @@ static void schedule_sensitive_triggers(struct sv *sv, priority_t priority) {
  * Enqueue all the sensitive continuations of a scheduled variable.
  */
 static void schedule_all_sensitive_triggers(struct sv *sv) {
-  for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
+  for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next) {
     if (!trigger->act->scheduled)
       schedule_act(trigger->act);
+  }
 }
 
 /**
@@ -205,10 +206,18 @@ void set_now(ssm_time_t n) { now = n; }
 void ssm_mark_complete() { set_now(NO_EVENT_SCHEDULED); }
 bool ssm_is_complete() { return get_now() == NO_EVENT_SCHEDULED; }
 
-ssm_time_t tick() {
+void tick() {
 #ifdef DEBUG
   printf("tick called. event_queue_len: %lu\n", event_queue_len);
 #endif
+  const struct sv *event_head = peek_event_queue();
+  if (event_head) {
+    // If there is a sv event, then either we are simply progressing in time or
+    // there were events scheduled for after the main ssm routine completed.
+    assert(get_now() < event_head->later_time || !act_queue_len);
+    set_now(event_head->later_time);
+  }
+
   /*
    * For each queued event scheduled for the current time, remove the event from
    * the queue, update its variable, and schedule everything sensitive to it.
@@ -228,6 +237,10 @@ ssm_time_t tick() {
       requeue_event(event_queue, &event_queue_len, QUEUE_HEAD);
   }
 
+  if (!act_queue_len && !event_queue_len) {
+    ssm_mark_complete();
+    return;
+  }
   /*
    * Until the queue is empty, take the lowest-numbered continuation from the
    * activation record queue and run it, which might insert additional
@@ -243,6 +256,7 @@ ssm_time_t tick() {
     printf("\tact: %s\n", act_queue[QUEUE_HEAD + i]->act_name);
 #endif
 
+  ssm_time_t now_saved = now;
   while (act_queue_len > 0) {
     struct act *to_run = unschedule_act(QUEUE_HEAD);
 #ifdef DEBUG
@@ -252,11 +266,11 @@ ssm_time_t tick() {
     to_run->step(to_run);
   }
 
-  timestep();
-  const struct sv *event_head = peek_event_queue();
-  set_now(event_head ? event_head->later_time : NO_EVENT_SCHEDULED);
-
-  return get_now();
+  if (event_queue_len && ssm_is_complete()) {
+    // We just exited the main routine but we still have variables scheduled.
+    set_now(now_saved);
+    return;
+  }
 }
 
 /*** Runtime API }}} ***/

@@ -83,12 +83,11 @@ void step_fib(struct act *act) {
     a->tmp1 = a->tmp2.value + a->tmp3.value;
     PTR_ASSIGN(a->result, act->priority, a->tmp1);
     act_leave(act, sizeof(fib_act_t));
-    ssm_mark_complete();
     return;
   }
 }
 
-void top_return(struct act *cont) { return; }
+void top_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   i32_svt result;

@@ -70,13 +70,12 @@ void step_fib(struct act *act) {
   case 1:
     PTR_ASSIGN(a->r, act->priority, *DEREF(int, a->r) + a->r2.value);
     act_leave(act, sizeof(fib_act_t));
-    ssm_mark_complete();
     return;
   }
   assert(0);
 }
 
-void top_return(struct act *cont) { return; }
+void top_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   int n = argc > 1 ? atoi(argv[1]) : 3;
