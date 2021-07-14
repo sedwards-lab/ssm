@@ -15,6 +15,13 @@
  *     if n < 2 then after 1s r = 1 else
  *       fork sum(r1, r2, r)  fib(n-1, r1)  fib(n-2, r2)
  *
+ *   main
+ *    var n = argv[1]
+ *    var result = 0
+ *    fork fib(n, result)
+ *    wait result
+ *    print result
+ *
  * 0 1 2 3 4 5  6  7  8  9 10  11  12  13
  * 1 1 2 3 5 8 13 21 34 55 89 144 233 377
  */
@@ -46,6 +53,16 @@ typedef struct {
   ptr_i32_svt r; /* Where we should write our result */
   i32_svt r1, r2;
 } act_fib_t;
+
+typedef struct {
+  struct act act;
+
+  int n;
+  i32_svt result;
+
+
+  struct trigger trigger1;
+} act_main_t;
 
 stepf_t step_mywait;
 
@@ -155,7 +172,51 @@ void step_fib(struct act *act) {
     return;
   }
   case 1:
+    unschedule_event(&a->r1.sv);
+    unschedule_event(&a->r2.sv);
     act_leave(act, sizeof(act_fib_t));
+    return;
+  }
+}
+
+stepf_t step_main;
+
+struct act *enter_main(struct act *cont, priority_t priority, depth_t depth,
+                       int n) {
+  struct act *act =
+      act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
+  DEBUG_ACT_NAME(act, "main");
+  act_main_t *a = container_of(act, act_main_t, act);
+
+  initialize_event(&a->result.sv, &i32_vtable);
+  DEBUG_SV_NAME(&a->result.sv, "result");
+
+  a->result.sv.var_name = "result";
+  a->n = n;
+
+  return act;
+}
+
+void step_main(struct act *act) {
+  act_main_t *a = container_of(act, act_main_t, act);
+  switch (act->pc) {
+  case 0: {
+    a->result.value = 0;
+
+    a->trigger1.act = act;
+    sensitize(&a->result.sv, &a->trigger1);
+    act_fork(enter_fib(act, act->priority, act->depth, a->n,
+                       PTR_OF_SV(a->result.sv)));
+    act->pc = 1;
+    return;
+  }
+  case 1:
+    if (last_updated_event(&a->result.sv)) {
+      desensitize(&a->trigger1);
+      printf("result = %d\n", a->result.value);
+      unschedule_event(&a->result.sv);
+      act_leave(act, sizeof(act_main_t));
+    }
     return;
   }
 }
@@ -166,18 +227,12 @@ int main(int argc, char *argv[]) {
   initialize_ssm(0);
   initialize_time_driver(0);
 
-  i32_svt result;
-  initialize_event(&result.sv, &i32_vtable);
-  DEBUG_SV_NAME(&result.sv, "result");
-  result.value = 0;
-
   int n = argc > 1 ? atoi(argv[1]) : 3;
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
 
-  act_fork(enter_fib(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n,
-                     PTR_OF_SV(result.sv)));
+  act_fork(enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT, n));
 
   tick();
   do {
@@ -186,6 +241,5 @@ int main(int argc, char *argv[]) {
     tick();
   } while (!ssm_is_complete());
 
-  printf("%d\n", result.value);
   return 0;
 }

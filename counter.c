@@ -316,6 +316,11 @@ void step_main(struct act *act) {
     act->pc = 1;
     return;
   case 1:
+    unschedule_event(&a->clk.sv);
+    unschedule_event(&a->d1.sv);
+    unschedule_event(&a->d2.sv);
+    unschedule_event(&a->q1.sv);
+    unschedule_event(&a->q2.sv);
     act_leave(act, sizeof(act_main_t));
     ssm_mark_complete();
     return;

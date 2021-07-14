@@ -69,6 +69,7 @@ void step_fib(struct act *act) {
   }
   case 1:
     PTR_ASSIGN(a->r, act->priority, *DEREF(int, a->r) + a->r2.value);
+    unschedule_event(&a->r2.sv);
     act_leave(act, sizeof(fib_act_t));
     return;
   }

@@ -100,7 +100,7 @@ static void update_event(struct sv *sv) {
 
 /*** Internal helpers }}} ***/
 
-/*** Events API, exposed via ssm-event.h {{{ ***/
+/*** Events API, exposed via ssm-sv.h {{{ ***/
 
 void initialize_event(struct sv *sv, const struct svtable *vtable) {
   sv->vtable = vtable;
@@ -110,7 +110,7 @@ void initialize_event(struct sv *sv, const struct svtable *vtable) {
   sv->var_name = "(no var name)";
 }
 
-void assign_event(struct sv *sv, priority_t prio) {
+void unschedule_event(struct sv *sv) {
   if (sv->later_time != NO_EVENT_SCHEDULED) {
     /* Note that for aggregate data types, we assume that any conflicting
      * updates have been resolved by this point. If sv->later_time is not set to
@@ -123,6 +123,11 @@ void assign_event(struct sv *sv, priority_t prio) {
     sv->later_time = NO_EVENT_SCHEDULED;
     dequeue_event(event_queue, &event_queue_len, idx);
   }
+
+}
+
+void assign_event(struct sv *sv, priority_t prio) {
+  unschedule_event(sv);
 
   sv->last_updated = now;
   schedule_sensitive_triggers(sv, prio);
@@ -214,7 +219,7 @@ void tick() {
   if (event_head) {
     // If there is a sv event, then either we are simply progressing in time or
     // there were events scheduled for after the main ssm routine completed.
-    assert(get_now() < event_head->later_time || !act_queue_len);
+    assert(get_now() < event_head->later_time);
     set_now(event_head->later_time);
   }
 
@@ -237,10 +242,6 @@ void tick() {
       requeue_event(event_queue, &event_queue_len, QUEUE_HEAD);
   }
 
-  if (!act_queue_len && !event_queue_len) {
-    ssm_mark_complete();
-    return;
-  }
   /*
    * Until the queue is empty, take the lowest-numbered continuation from the
    * activation record queue and run it, which might insert additional
@@ -256,7 +257,6 @@ void tick() {
     printf("\tact: %s\n", act_queue[QUEUE_HEAD + i]->act_name);
 #endif
 
-  ssm_time_t now_saved = now;
   while (act_queue_len > 0) {
     struct act *to_run = unschedule_act(QUEUE_HEAD);
 #ifdef DEBUG
@@ -264,12 +264,6 @@ void tick() {
            act_queue_len);
 #endif
     to_run->step(to_run);
-  }
-
-  if (event_queue_len && ssm_is_complete()) {
-    // We just exited the main routine but we still have variables scheduled.
-    set_now(now_saved);
-    return;
   }
 }
 

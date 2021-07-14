@@ -88,6 +88,7 @@ void step_second_clock(struct act *act) {
       }
     } /* end loop */
   }
+  unschedule_event(&a->timer);
   act_leave(act, sizeof(act_second_clock_t));
 }
 
@@ -135,6 +136,7 @@ void step_report_seconds(struct act *act) {
       printf("%d\n", a->seconds.value);
     } /* end of loop */
   }
+  unschedule_event(&a->seconds.sv);
   act_leave(act, sizeof(act_report_seconds_t));
 }
 
@@ -176,6 +178,7 @@ void step_main(struct act *act) {
     act->pc = 1;
     return;
   case 1:
+    unschedule_event(&a->second);
     act_leave(act, sizeof(act_main_t));
     return;
   }

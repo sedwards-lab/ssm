@@ -138,6 +138,9 @@ void step_main(struct act *act) {
 
   case 1:
     printf("c = %d\n", a->c.value);
+    unschedule_event(&a->a.sv);
+    unschedule_event(&a->b.sv);
+    unschedule_event(&a->c.sv);
     act_leave(act, sizeof(act_main_t));
     return;
   }
