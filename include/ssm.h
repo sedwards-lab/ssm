@@ -68,14 +68,42 @@ See [the detailed documentation](@ref all)
 #define SSM_ACT_FREE(ptr, size) free(ptr)
 #endif
 
-#ifndef SSM_RESOURCES_EXHAUSTED
-/** Invoked when limited resources are exhausted, e.g., unable to
- *  allocate memory, no more queue space.  Not expected to return
+#ifndef SSM_CRASH
+/** Invoked when a process must terminate, e.g., when memory or queue space is
+ * exhausted. Not expected to return.
  *
- * Argument passed is a string indicating where the failure occurred.
+ * Argument passed is an ssm_error_t indicating why the failure occurred.
  */
-#define SSM_RESOURCES_EXHAUSTED(string) exit(1)
+#define SSM_CRASH(reason) exit(reason)
 #endif
+
+/** Error codes, indicating reason for failure.
+ *
+ * Platforms may extend the list of errors using SSM_PLATFORM_ERROR like this:
+ *
+ *      enum {
+ *        SSM_CUSTOM_ERROR1 = SSM_PLATFORM_ERROR,
+ *        // etc.
+ *      };
+ */
+enum ssm_error_t {
+  /** No error, but abruptly halts process without cleanup. */
+  SSM_TERMINATE = 0,
+  /** Reserved for unforeseen, non-user-facing errors. */
+  SSM_INTERNAL_ERROR,
+  /** Tried to insert into full activation record queue. */
+  SSM_EXHAUSTED_ACT_QUEUE,
+  /** Tried to insert into full event queue. */
+  SSM_EXHAUSTED_EVENT_QUEUE,
+  /** Could not allocate more memory. */
+  SSM_EXHAUSTED_MEMORY,
+  /** Tried to exceed available recursion depth. */
+  SSM_EXHAUSTED_DEPTH,
+  /** Invalid time, e.g., scheduled delayed assignment at an earlier time. */
+  SSM_INVALID_TIME,
+  /** Start of platform-specific error code range. */
+  SSM_PLATFORM_ERROR
+};
 
 #ifndef SSM_SECOND
 /** Ticks in a second
@@ -266,7 +294,7 @@ static inline ssm_act_t *ssm_enter(size_t bytes, /**< size of the activation rec
   assert(parent);
   ++parent->children;
   ssm_act_t *act = (ssm_act_t *)SSM_ACT_MALLOC(bytes);
-  if (!act) SSM_RESOURCES_EXHAUSTED("ssm_enter");
+  if (!act) SSM_CRASH(SSM_EXHAUSTED_MEMORY);
   *act = (ssm_act_t){
       .step = step,
       .caller = parent,
