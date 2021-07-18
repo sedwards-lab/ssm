@@ -49,6 +49,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -110,7 +111,7 @@ void step_clock(struct act *act) {
   switch (act->pc) {
   case 0:
     for (;;) { /* loop */
-      later_event(&a->timer, now + 100);
+      later_event(&a->timer, get_now() + 100);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -124,7 +125,7 @@ void step_clock(struct act *act) {
 
       PTR_ASSIGN(a->clk, act->priority, true);
 
-      later_event(&a->timer, now + 100);
+      later_event(&a->timer, get_now() + 100);
 
       a->trigger1.act = act;
       sensitize(&a->timer, &a->trigger1); /* await @timer */
@@ -139,6 +140,7 @@ void step_clock(struct act *act) {
       PTR_ASSIGN(a->clk, act->priority, false);
     }
   }
+  unschedule_event(&a->timer);
   act_leave(act, sizeof(act_clock_t));
 }
 
@@ -340,17 +342,23 @@ void step_main(struct act *act) {
     act->pc = 1;
     return;
   case 1:
+    unschedule_event(&a->clk.sv);
+    unschedule_event(&a->d1.sv);
+    unschedule_event(&a->d2.sv);
+    unschedule_event(&a->q1.sv);
+    unschedule_event(&a->q2.sv);
     act_leave(act, sizeof(act_adder_t));
     return;
   }
 }
 
-void main_return(struct act *cont) { return; }
+void main_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
 
   initialize_ssm(0);
+  initialize_time_driver(0);
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -358,9 +366,12 @@ int main(int argc, char *argv[]) {
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 
-  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick())
-    printf("next %lu\n", now);
+  tick();
+  do {
+    printf("now: %lu\n", get_now());
+    timestep();
+    tick();
+  } while (--stop_at > 0 && !ssm_is_complete());
 
   return 0;
 }

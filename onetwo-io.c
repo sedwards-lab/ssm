@@ -1,5 +1,5 @@
 /**
- * onetwo example from paper:
+ * modified onetwo example from paper, for linux io:
  *
  *   one &a
  *     wait a
@@ -10,10 +10,8 @@
  *     a = a * 2
  *
  *   main
- *     var a = 0
- *     after 1s a = 10
- *     fork one(a) two(a)
- *     // a = 22 here
+ *     fork one(stdin) two(stdin)
+ *     // a = (stdin + 1) * 2 here
  */
 
 #include <stdio.h>
@@ -27,25 +25,25 @@
 
 typedef struct {
   struct act act;
-  ptr_i32_svt a;
+  ptr_u32_svt a;
   struct trigger trigger1;
 } act_one_t;
 
 typedef struct {
   struct act act;
-  ptr_i32_svt a;
+  ptr_u32_svt a;
   struct trigger trigger1;
 } act_two_t;
 
 typedef struct {
   struct act act;
-  i32_svt a;
+  ptr_u8_svt stdin_sv;
 } act_main_t;
 
 stepf_t step_one;
 
 struct act *enter_one(struct act *cont, priority_t priority, depth_t depth,
-                      ptr_i32_svt a) {
+                      ptr_u32_svt a) {
   struct act *act =
       act_enter(sizeof(act_one_t), step_one, cont, priority, depth);
   DEBUG_ACT_NAME(act, "one");
@@ -78,7 +76,7 @@ void step_one(struct act *act) {
 stepf_t step_two;
 
 struct act *enter_two(struct act *cont, priority_t priority, depth_t depth,
-                      ptr_i32_svt a) {
+                      ptr_u32_svt a) {
   struct act *act =
       act_enter(sizeof(act_two_t), step_two, cont, priority, depth);
   DEBUG_ACT_NAME(act, "two");
@@ -112,12 +110,9 @@ struct act *enter_main(struct act *cont, priority_t priority, depth_t depth) {
   struct act *act =
       act_enter(sizeof(act_main_t), step_main, cont, priority, depth);
   DEBUG_ACT_NAME(act, "main");
-  act_main_t *a = container_of(act, act_main_t, act);
 
-  initialize_event(&a->a.sv, &i32_vtable);
-  DEBUG_SV_NAME(&a->a.sv, "a");
-
-  a->a.sv.var_name = "a";
+  act_main_t *ac = container_of(act, act_main_t, act);
+  ac->stdin_sv = PTR_OF_SV(get_stdin_var()->sv);
 
   return act;
 }
@@ -126,25 +121,22 @@ void step_main(struct act *act) {
   act_main_t *a = container_of(act, act_main_t, act);
   switch (act->pc) {
   case 0: {
-    /* We could initialize a->a here, but no need */
-    a->a.sv.vtable->later(&a->a.sv, get_now() + TICKS_PER_SECOND, 10);
-
     depth_t new_depth = act->depth - 1; /* 2 children */
     priority_t new_priority = act->priority;
     priority_t pinc = 1 << new_depth;
 
-    act_fork(enter_one(act, new_priority, new_depth, PTR_OF_SV(a->a.sv)));
+    act_fork(enter_one(act, new_priority, new_depth, a->stdin_sv));
     new_priority += pinc;
 
-    act_fork(enter_two(act, new_priority, new_depth, PTR_OF_SV(a->a.sv)));
+    act_fork(enter_two(act, new_priority, new_depth, a->stdin_sv));
     act->pc = 1;
     return;
   }
-  case 1:
-    printf("a = %d\n", a->a.value);
-    unschedule_event(&a->a.sv);
+  case 1: {
+    printf("a = %d\n", *DEREF(uint8_t, a->stdin_sv));
     act_leave(act, sizeof(act_main_t));
     return;
+  }
   }
 }
 
@@ -153,6 +145,7 @@ void top_return(struct act *cont) { ssm_mark_complete(); }
 int main() {
   initialize_ssm(0);
   initialize_time_driver(0);
+  initialize_io();
 
   struct act top = {.step = top_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -166,5 +159,6 @@ int main() {
     tick();
   } while (!ssm_is_complete());
 
+  deinitialize_io();
   return 0;
 }

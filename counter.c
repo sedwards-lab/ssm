@@ -35,6 +35,7 @@
 #include "ssm-act.h"
 #include "ssm-debug.h"
 #include "ssm-runtime.h"
+#include "ssm-time-driver.h"
 #include "ssm-types.h"
 
 typedef struct {
@@ -117,12 +118,14 @@ void step_clk(struct act *act) {
 
   switch (act->pc) {
   case 0:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 1);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 1);
     act->pc = 1;
     return;
 
   case 1:
-    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv, now + 100, 0);
+    a->static_link->clk.sv.vtable->later(&a->static_link->clk.sv,
+                                         get_now() + 100, 0);
     act->pc = 0;
     return;
   }
@@ -313,18 +316,25 @@ void step_main(struct act *act) {
     act->pc = 1;
     return;
   case 1:
+    unschedule_event(&a->clk.sv);
+    unschedule_event(&a->d1.sv);
+    unschedule_event(&a->d2.sv);
+    unschedule_event(&a->q1.sv);
+    unschedule_event(&a->q2.sv);
     act_leave(act, sizeof(act_main_t));
+    ssm_mark_complete();
     return;
   }
   assert(0);
 }
 
-void main_return(struct act *cont) { return; }
+void main_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   ssm_time_t stop_at = argc > 1 ? atoi(argv[1]) : 10;
 
   initialize_ssm(0);
+  initialize_time_driver(0);
 
   struct act top = {.step = main_return};
   DEBUG_ACT_NAME(&top, "top");
@@ -332,9 +342,12 @@ int main(int argc, char *argv[]) {
   struct act *act = enter_main(&top, PRIORITY_AT_ROOT, DEPTH_AT_ROOT);
   act_fork(act);
 
-  for (ssm_time_t next = tick(); stop_at > 0 && next != NO_EVENT_SCHEDULED;
-       stop_at--, next = tick())
-    printf("next %lu\n", now);
+  tick();
+  do {
+    printf("now: %lu\n", get_now());
+    timestep();
+    tick();
+  } while (--stop_at > 0 && !ssm_is_complete());
 
   return 0;
 }

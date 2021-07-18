@@ -7,6 +7,7 @@
 #include "ssm-queue.h"
 #include "ssm-runtime.h"
 #include "ssm-sv.h"
+#include "ssm-time-driver.h"
 
 #define ACT_QUEUE_SIZE 1024
 #define EVENT_QUEUE_SIZE 1024
@@ -16,8 +17,8 @@
  *
  * Managed as a binary heap sorted by e->later_time, implemented in ssm-queue.c.
  */
-struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
-size_t event_queue_len = 0;
+static struct sv *event_queue[EVENT_QUEUE_SIZE + QUEUE_HEAD];
+static size_t event_queue_len = 0;
 
 /**
  * Activation record queue, used to track and schedule continuations at each
@@ -25,14 +26,15 @@ size_t event_queue_len = 0;
  *
  * Managed as a binary heap sorted by a->priority, implemented in ssm-queue.c.
  */
-struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
+static struct act *act_queue[ACT_QUEUE_SIZE + QUEUE_HEAD];
 size_t act_queue_len = 0;
 
 /**
  * Note that this starts out uninitialized. It is the responsibility of the
- * runtime to do so.
+ * runtime to do so. Set to NO_EVENT_SCHEDULED to indicate that the runtime has
+ * completed.
  */
-ssm_time_t now;
+static ssm_time_t now;
 
 /*** Internal helpers {{{ ***/
 
@@ -66,9 +68,10 @@ static void schedule_sensitive_triggers(struct sv *sv, priority_t priority) {
  * Enqueue all the sensitive continuations of a scheduled variable.
  */
 static void schedule_all_sensitive_triggers(struct sv *sv) {
-  for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next)
+  for (struct trigger *trigger = sv->triggers; trigger; trigger = trigger->next) {
     if (!trigger->act->scheduled)
       schedule_act(trigger->act);
+  }
 }
 
 /**
@@ -97,7 +100,7 @@ static void update_event(struct sv *sv) {
 
 /*** Internal helpers }}} ***/
 
-/*** Events API, exposed via ssm-event.h {{{ ***/
+/*** Events API, exposed via ssm-sv.h {{{ ***/
 
 void initialize_event(struct sv *sv, const struct svtable *vtable) {
   sv->vtable = vtable;
@@ -107,7 +110,7 @@ void initialize_event(struct sv *sv, const struct svtable *vtable) {
   sv->var_name = "(no var name)";
 }
 
-void assign_event(struct sv *sv, priority_t prio) {
+void unschedule_event(struct sv *sv) {
   if (sv->later_time != NO_EVENT_SCHEDULED) {
     /* Note that for aggregate data types, we assume that any conflicting
      * updates have been resolved by this point. If sv->later_time is not set to
@@ -120,6 +123,11 @@ void assign_event(struct sv *sv, priority_t prio) {
     sv->later_time = NO_EVENT_SCHEDULED;
     dequeue_event(event_queue, &event_queue_len, idx);
   }
+
+}
+
+void assign_event(struct sv *sv, priority_t prio) {
+  unschedule_event(sv);
 
   sv->last_updated = now;
   schedule_sensitive_triggers(sv, prio);
@@ -188,12 +196,33 @@ void desensitize(struct trigger *trigger) {
 
 /*** Runtime API, exposed via ssm-runtime.h ***/
 
-void initialize_ssm(ssm_time_t start) { now = start; }
+void initialize_ssm(ssm_time_t start) {
+  now = start;
+}
 
-ssm_time_t tick() {
+const struct sv *peek_event_queue() {
+  return event_queue_len > 0 ? event_queue[QUEUE_HEAD] : NULL;
+}
+
+ssm_time_t get_now() { return now; }
+
+void set_now(ssm_time_t n) { now = n; }
+
+void ssm_mark_complete() { set_now(NO_EVENT_SCHEDULED); }
+bool ssm_is_complete() { return get_now() == NO_EVENT_SCHEDULED; }
+
+void tick() {
 #ifdef DEBUG
   printf("tick called. event_queue_len: %lu\n", event_queue_len);
 #endif
+  const struct sv *event_head = peek_event_queue();
+  if (event_head) {
+    // If there is a sv event, then either we are simply progressing in time or
+    // there were events scheduled for after the main ssm routine completed.
+    assert(get_now() < event_head->later_time);
+    set_now(event_head->later_time);
+  }
+
   /*
    * For each queued event scheduled for the current time, remove the event from
    * the queue, update its variable, and schedule everything sensitive to it.
@@ -236,14 +265,6 @@ ssm_time_t tick() {
 #endif
     to_run->step(to_run);
   }
-
-  /*
-   * FIXME: this interface isn't really usable. We want the runtime driver to be
-   * able to interrupt sooner than now, so that it can respond to I/O etc.
-   */
-  now = event_queue_len > 0 ? event_queue[QUEUE_HEAD]->later_time
-                            : NO_EVENT_SCHEDULED;
-  return now;
 }
 
 /*** Runtime API }}} ***/

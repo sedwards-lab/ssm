@@ -87,7 +87,7 @@ void step_fib(struct act *act) {
   }
 }
 
-void top_return(struct act *cont) { return; }
+void top_return(struct act *cont) { ssm_mark_complete(); }
 
 int main(int argc, char *argv[]) {
   i32_svt result;

@@ -2,9 +2,11 @@
  * Implementations of type-specific scheduled variables, whose vtable methods
  * are aware of the size and layout of their respective payloads.
  */
+#include <unistd.h>
 
 #include "ssm-types.h"
 #include "ssm-queue.h" /* For managing inner queues */
+#include "ssm-runtime.h" /* For accessing current time */
 
 const struct svtable *unit_vtable = NULL;
 

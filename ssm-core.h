@@ -36,12 +36,6 @@ typedef uint8_t depth_t;
 /** The depth at the entry point of an SSM program. */
 #define DEPTH_AT_ROOT 32
 
-/**
- * The logical time of the current instant.
- * Defined and maintained by ssm-sched.c. Should not be modified by anyone else.
- */
-extern ssm_time_t now;
-
 /*** Forward struct declarations ***/
 
 struct sv;      /* Defined in ssm-sv.h */

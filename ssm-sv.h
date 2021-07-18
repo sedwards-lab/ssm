@@ -113,6 +113,7 @@ struct sv {
  * used by type-specific implementations.
  */
 extern void initialize_event(struct sv *, const struct svtable *);
+extern void unschedule_event(struct sv *);
 extern void assign_event(struct sv *, priority_t);
 extern void later_event(struct sv *, ssm_time_t);
 extern ssm_time_t last_updated_event(struct sv *);
