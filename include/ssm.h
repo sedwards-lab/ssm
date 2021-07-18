@@ -68,14 +68,15 @@ See [the detailed documentation](@ref all)
 #define SSM_ACT_FREE(ptr, size) free(ptr)
 #endif
 
-#ifndef SSM_CRASH
 /** Invoked when a process must terminate, e.g., when memory or queue space is
  * exhausted. Not expected to return.
  *
  * Argument passed is an ssm_error_t indicating why the failure occurred.
  */
-#define SSM_CRASH(reason) exit(reason)
-#endif
+#define SSM_CRASH(reason) ssm_crash(reason, __FILE__, __LINE__, __func__)
+
+/** Underlying crash handler; can be overriden. */
+void ssm_crash(int reason, const char *file, int line, const char *func);
 
 /** Error codes, indicating reason for failure.
  *
