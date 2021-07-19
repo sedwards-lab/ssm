@@ -169,7 +169,7 @@ void ssm_activate(ssm_act_t *act)
   q_idx_t hole = ++act_queue_len;
 
   if (act_queue_len > SSM_ACT_QUEUE_SIZE)
-    SSM_CRASH(SSM_EXHAUSTED_ACT_QUEUE);
+    SSM_THROW(SSM_EXHAUSTED_ACT_QUEUE);
 
   act_queue_percolate_up(hole, act);
 }
@@ -265,13 +265,13 @@ void ssm_schedule(ssm_sv_t *var, ssm_time_t later)
 {
   assert(var);      // A real variable
   if (later <= now) // "later" must be in the future
-    SSM_CRASH(SSM_INVALID_TIME);
+    SSM_THROW(SSM_INVALID_TIME);
 
   if (var->later_time == SSM_NEVER) {
     // Variable does not have a pending event: add it to the queue
     q_idx_t hole = ++event_queue_len;
     if (event_queue_len > SSM_EVENT_QUEUE_SIZE)
-      SSM_CRASH(SSM_EXHAUSTED_EVENT_QUEUE);
+      SSM_THROW(SSM_EXHAUSTED_EVENT_QUEUE);
 
     var->later_time = later;
     event_queue_percolate_up(hole, var);
