@@ -73,15 +73,15 @@ See [the detailed documentation](@ref all)
  *
  * Argument passed is an ssm_error_t indicating why the failure occurred.
  * Default behavior is to exit with reason as the exit code, but can be
- * overridden by defining ssm_crash.
+ * overridden by defining ssm_throw.
  */
-#define SSM_CRASH(reason) \
-  ssm_crash ? \
-    ssm_crash(reason, __FILE__, __LINE__, __func__) : \
+#define SSM_THROW(reason) \
+  ssm_throw ? \
+    ssm_throw(reason, __FILE__, __LINE__, __func__) : \
     exit(reason)
 
 /** Underlying crash handler; can be overriden. */
-void ssm_crash(int reason, const char *file, int line, const char *func)
+void ssm_throw(int reason, const char *file, int line, const char *func)
   __attribute__((weak));
 
 /** Error codes, indicating reason for failure.
@@ -94,10 +94,8 @@ void ssm_crash(int reason, const char *file, int line, const char *func)
  *      };
  */
 enum ssm_error_t {
-  /** No error, but abruptly halts process without cleanup. */
-  SSM_TERMINATE = 0,
   /** Reserved for unforeseen, non-user-facing errors. */
-  SSM_INTERNAL_ERROR,
+  SSM_INTERNAL_ERROR = 1,
   /** Tried to insert into full activation record queue. */
   SSM_EXHAUSTED_ACT_QUEUE,
   /** Tried to insert into full event queue. */
@@ -105,7 +103,7 @@ enum ssm_error_t {
   /** Could not allocate more memory. */
   SSM_EXHAUSTED_MEMORY,
   /** Tried to exceed available recursion depth. */
-  SSM_EXHAUSTED_DEPTH,
+  SSM_EXHAUSTED_PRIORITY,
   /** Invalid time, e.g., scheduled delayed assignment at an earlier time. */
   SSM_INVALID_TIME,
   /** Start of platform-specific error code range. */
@@ -301,7 +299,7 @@ static inline ssm_act_t *ssm_enter(size_t bytes, /**< size of the activation rec
   assert(parent);
   ++parent->children;
   ssm_act_t *act = (ssm_act_t *)SSM_ACT_MALLOC(bytes);
-  if (!act) SSM_CRASH(SSM_EXHAUSTED_MEMORY);
+  if (!act) SSM_THROW(SSM_EXHAUSTED_MEMORY);
   *act = (ssm_act_t){
       .step = step,
       .caller = parent,
