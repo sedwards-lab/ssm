@@ -72,11 +72,17 @@ See [the detailed documentation](@ref all)
  * exhausted. Not expected to return.
  *
  * Argument passed is an ssm_error_t indicating why the failure occurred.
+ * Default behavior is to exit with reason as the exit code, but can be
+ * overridden by defining ssm_crash.
  */
-#define SSM_CRASH(reason) ssm_crash(reason, __FILE__, __LINE__, __func__)
+#define SSM_CRASH(reason) \
+  ssm_crash ? \
+    ssm_crash(reason, __FILE__, __LINE__, __func__) : \
+    exit(reason)
 
 /** Underlying crash handler; can be overriden. */
-void ssm_crash(int reason, const char *file, int line, const char *func);
+void ssm_crash(int reason, const char *file, int line, const char *func)
+  __attribute__((weak));
 
 /** Error codes, indicating reason for failure.
  *

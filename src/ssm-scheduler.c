@@ -353,11 +353,6 @@ void ssm_tick()
   }
 }
 
-void __attribute__((weak))
-  ssm_crash(int reason, const char *file, int line, const char *func) {
-  exit(reason);
-}
-
 #ifdef SSM_DEBUG
 /** Assert the event queue is well-formed
  */
