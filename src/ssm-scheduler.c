@@ -297,8 +297,8 @@ void ssm_unschedule(ssm_sv_t *var)
     q_idx_t hole = find_queued_event(var);
     var->later_time = SSM_NEVER;
     ssm_sv_t *moved_var = event_queue[event_queue_len--];
-    if (event_queue_len > 0) {
-      // Only percolate if there events left in the queue.
+    if (hole < SSM_QUEUE_HEAD + event_queue_len) {
+      // Percolate if removal led to hole in the queue.
       if (hole == SSM_QUEUE_HEAD ||
           event_queue[hole >> 1]->later_time < moved_var->later_time)
         event_queue_percolate_down(hole, moved_var);
