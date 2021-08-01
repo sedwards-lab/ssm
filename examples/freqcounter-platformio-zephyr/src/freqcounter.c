@@ -1,9 +1,12 @@
+/**
+ * A frequency counter with a fixed gate period.
+ *
+ * Press sw0 to begin sampling; samples taken from sw1. Reports frequency count
+ * to serial console.
+ */
 #include "ssm-platform.h"
 
-#define TIME_SHORT (u64)200 * SSM_MILLISECOND
-#define TIME_LONG TIME_SHORT * 2
-#define TIME_VERY_LONG TIME_LONG * 4
-#define TIME_BLIP (u64) SSM_MICROSECOND
+#define GATE_PERIOD ((ssm_time_t) 1 * SSM_SECOND)
 
 typedef struct {
   struct ssm_act act;
@@ -22,6 +25,7 @@ typedef struct {
   struct ssm_act act;
   ssm_event_t *gate;
   ssm_event_t *signal;
+  ssm_event_t wake;
   struct ssm_trigger trig1;
   struct ssm_trigger trig2;
   ssm_time_t start_time;
@@ -77,8 +81,6 @@ void step_fun0(struct ssm_act *actg) {
   ssm_leave(actg, sizeof(act_fun0_t));
 }
 
-/** Generated code, unmodified **/
-
 struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth, ssm_event_t *gate,
                            ssm_event_t *signal) {
@@ -91,11 +93,10 @@ struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
   acts->trig1.act = actg;
   acts->trig2.act = actg;
 
+  ssm_initialize_event(&acts->wake);
   acts->start_time = 0;
   acts->count = 0;
 
-  ssm_sensitize(acts->gate, &acts->trig1);
-  ssm_sensitize(acts->signal, &acts->trig2);
   return actg;
 }
 
@@ -104,42 +105,51 @@ void step_fun1(struct ssm_act *actg) {
 
   switch (actg->pc) {
   case 0:; // Gate not active
-    if (ssm_event_on(acts->gate)) {
-      // Start counting
-      actg->pc = 1;
-      acts->start_time = ssm_now();
+    SSM_DEBUG_PRINT("Starting freqcounter with period: %llu\r\n", GATE_PERIOD);
+
+    while (true) {
+      while (true) { // Wait for gate
+        if (ssm_event_on(acts->gate)) {
+          SSM_DEBUG_PRINT("Received gate (%llu), starting to count...\r\n",
+                 acts->start_time);
+          break;
+        }
+        ssm_sensitize(acts->gate, &acts->trig1);
+        actg->pc = 1;
+        return;
+  case 1:;
+        ssm_desensitize(&acts->trig1);
+      }
+
+      // Inclusive of gate period start
       acts->count = !!ssm_event_on(acts->signal);
-      SSM_DEBUG_PRINT("Received gate (%llu), starting to count...\r\n",
-             acts->start_time);
+      ssm_later_event(&acts->wake, ssm_now() + GATE_PERIOD);
+
+      while (true) {
+        ssm_sensitize(acts->signal, &acts->trig1);
+        ssm_sensitize(&acts->wake, &acts->trig2);
+        actg->pc = 2;
+        return;
+  case 2:;
+        ssm_desensitize(&acts->trig1);
+        ssm_desensitize(&acts->trig2);
+        SSM_DEBUG_PRINT("Received signal, count: %u\r\n", acts->count);
+
+        // Exclusive of gate period end
+        if (ssm_event_on(&acts->wake))
+          break;
+        acts->count++;
+      }
+      SSM_DEBUG_PRINT("Count: %u\r\n", acts->count);
+
+      // FIXME: Zephyr doesn't seem to support FP arith by default, so this is
+      // pretty inaccurate for low frequencies due to rounding errors.
+      printk("Frequency: %llu Hz\r\n", acts->count * SSM_SECOND / GATE_PERIOD);
     }
-    return;
-
-  case 1:; // Gate active
-    if (ssm_event_on(acts->gate)) {
-      ssm_time_t period = ssm_now() - acts->start_time;
-      printk("Time period: %llu\r\n", period);
-      printk("Count: %u\r\n", acts->count);
-
-      // FIXME: Zephyr doesn't seem to support floating point, so this is going
-      // to be pretty heavily rounded for low frequencies.
-      printk("Frequency: %llu Hz\r\n", acts->count * SSM_SECOND / period);
-
-      // Stop counting
-      actg->pc = 0;
-      return;
-    }
-
-    // NOTE: we don't need to check event_on(signal); there's no other reason we
-    // could have woken up.
-    acts->count++;
-    SSM_DEBUG_PRINT("Received signal, count: %u\r\n", acts->count);
-    return;
   default:
     break;
   }
 
-  ssm_desensitize(&acts->trig1);
-  ssm_desensitize(&acts->trig2);
   ssm_leave(actg, sizeof(act_fun1_t));
 }
 
