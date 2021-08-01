@@ -35,8 +35,6 @@ struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
 
 void step_fun1(struct ssm_act *actg);
 
-/** Generated entrypoint, modified to also fork led_handler **/
-
 struct ssm_act *enter_fun0(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth) {
   struct ssm_act *actg =
@@ -89,8 +87,6 @@ void step_fun0(struct ssm_act *actg) {
   ssm_unschedule(&acts->led_pause);
   ssm_leave(actg, sizeof(act_fun0_t));
 }
-
-/** Generated code, unmodified **/
 
 struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth, ssm_bool_t *led_ctl,
