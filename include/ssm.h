@@ -437,8 +437,8 @@ extern ssm_act_t ssm_top_parent;
   ((type *)((char *)(member_type(type, member) *){ptr} -                       \
             offsetof(type, member)))
 
-typedef ssm_sv_t ssm_event_t;
-#define ssm_later_event(var, then) ssm_schedule((var), (then))
+typedef struct { ssm_sv_t sv; } ssm_event_t;
+#define ssm_later_event(var, then) ssm_schedule(&(var)->sv, (then))
 extern void ssm_assign_event(ssm_event_t *var, ssm_priority_t prio);
 extern void ssm_initialize_event(ssm_event_t *);
 
