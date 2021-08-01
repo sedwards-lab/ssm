@@ -1,2 +1,6 @@
 Use a 100 ms gate; count input events between gates and print measured frequency.
 Compare against lab instrument.
+
+
+This person built a frequency counter with a microcontroller and a GPS unit:
+https://swharden.com/blog/2016-09-05-vhf-frequency-counter-with-pc-interface/
