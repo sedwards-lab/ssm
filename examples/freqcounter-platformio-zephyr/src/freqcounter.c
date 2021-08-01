@@ -14,12 +14,12 @@ typedef struct {
   ssm_event_t signal;
   ssm_input_event_t sw0;
   ssm_input_event_t sw1;
-} act_fun0_t;
+} act_main_t;
 
-struct ssm_act *enter_fun0(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_main(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth);
 
-void step_fun0(struct ssm_act *actg);
+void step_main(struct ssm_act *actg);
 
 typedef struct {
   struct ssm_act act;
@@ -30,19 +30,19 @@ typedef struct {
   struct ssm_trigger trig2;
   ssm_time_t start_time;
   uint32_t count;
-} act_fun1_t;
+} act_freq_count_t;
 
-struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_freq_count(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth, ssm_event_t *gate,
                            ssm_event_t *signal);
 
-void step_fun1(struct ssm_act *actg);
+void step_freq_count(struct ssm_act *actg);
 
-struct ssm_act *enter_fun0(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_main(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth) {
   struct ssm_act *actg =
-      ssm_enter(sizeof(act_fun0_t), step_fun0, caller, priority, depth);
-  act_fun0_t *acts = container_of(actg, act_fun0_t, act);
+      ssm_enter(sizeof(act_main_t), step_main, caller, priority, depth);
+  act_main_t *acts = container_of(actg, act_main_t, act);
 
   ssm_initialize_event(&acts->gate);
   ssm_initialize_event(&acts->signal);
@@ -50,8 +50,8 @@ struct ssm_act *enter_fun0(struct ssm_act *caller, ssm_priority_t priority,
   return actg;
 }
 
-void step_fun0(struct ssm_act *actg) {
-  act_fun0_t *acts = container_of(actg, act_fun0_t, act);
+void step_main(struct ssm_act *actg) {
+  act_main_t *acts = container_of(actg, act_main_t, act);
 
   switch (actg->pc) {
 
@@ -62,7 +62,7 @@ void step_fun0(struct ssm_act *actg) {
     if (actg->depth < 0)
       SSM_THROW(SSM_EXHAUSTED_PRIORITY);
 
-    ssm_activate(enter_fun1(actg, actg->priority + 1 * (1 << actg->depth - 1),
+    ssm_activate(enter_freq_count(actg, actg->priority + 1 * (1 << actg->depth - 1),
                             actg->depth - 1, &acts->gate, &acts->signal));
     actg->pc = 1;
     return;
@@ -76,17 +76,17 @@ void step_fun0(struct ssm_act *actg) {
   unbind_input_handler(&acts->sw0);
   unbind_input_handler(&acts->sw1);
 
-  ssm_unschedule(&acts->gate);
-  ssm_unschedule(&acts->signal);
-  ssm_leave(actg, sizeof(act_fun0_t));
+  ssm_unschedule(&acts->gate.sv);
+  ssm_unschedule(&acts->signal.sv);
+  ssm_leave(actg, sizeof(act_main_t));
 }
 
-struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_freq_count(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth, ssm_event_t *gate,
                            ssm_event_t *signal) {
   struct ssm_act *actg =
-      ssm_enter(sizeof(act_fun1_t), step_fun1, caller, priority, depth);
-  act_fun1_t *acts = container_of(actg, act_fun1_t, act);
+      ssm_enter(sizeof(act_freq_count_t), step_freq_count, caller, priority, depth);
+  act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
 
   acts->gate = gate;
   acts->signal = signal;
@@ -100,21 +100,21 @@ struct ssm_act *enter_fun1(struct ssm_act *caller, ssm_priority_t priority,
   return actg;
 }
 
-void step_fun1(struct ssm_act *actg) {
-  act_fun1_t *acts = container_of(actg, act_fun1_t, act);
+void step_freq_count(struct ssm_act *actg) {
+  act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
 
   switch (actg->pc) {
   case 0:; // Gate not active
-    SSM_DEBUG_PRINT("Starting freqcounter with period: %llu\r\n", GATE_PERIOD);
+    SSM_DEBUG_PRINT("Starting freq_counter with period: %llu\r\n", GATE_PERIOD);
 
     while (true) {
       while (true) { // Wait for gate
-        if (ssm_event_on(acts->gate)) {
+        if (ssm_event_on(&acts->gate->sv)) {
           SSM_DEBUG_PRINT("Received gate (%llu), starting to count...\r\n",
                  acts->start_time);
           break;
         }
-        ssm_sensitize(acts->gate, &acts->trig1);
+        ssm_sensitize(&acts->gate->sv, &acts->trig1);
         actg->pc = 1;
         return;
   case 1:;
@@ -122,12 +122,12 @@ void step_fun1(struct ssm_act *actg) {
       }
 
       // Inclusive of gate period start
-      acts->count = !!ssm_event_on(acts->signal);
+      acts->count = !!ssm_event_on(&acts->signal->sv);
       ssm_later_event(&acts->wake, ssm_now() + GATE_PERIOD);
 
       while (true) {
-        ssm_sensitize(acts->signal, &acts->trig1);
-        ssm_sensitize(&acts->wake, &acts->trig2);
+        ssm_sensitize(&acts->signal->sv, &acts->trig1);
+        ssm_sensitize(&acts->wake.sv, &acts->trig2);
         actg->pc = 2;
         return;
   case 2:;
@@ -136,7 +136,7 @@ void step_fun1(struct ssm_act *actg) {
         SSM_DEBUG_PRINT("Received signal, count: %u\r\n", acts->count);
 
         // Exclusive of gate period end
-        if (ssm_event_on(&acts->wake))
+        if (ssm_event_on(&acts->wake.sv))
           break;
         acts->count++;
       }
@@ -150,8 +150,8 @@ void step_fun1(struct ssm_act *actg) {
     break;
   }
 
-  ssm_leave(actg, sizeof(act_fun1_t));
+  ssm_leave(actg, sizeof(act_freq_count_t));
 }
 
 struct ssm_act *(*ssm_entry_point)(struct ssm_act *, ssm_priority_t,
-                                   ssm_depth_t) = enter_fun0;
+                                   ssm_depth_t) = enter_main;
