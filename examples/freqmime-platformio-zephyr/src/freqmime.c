@@ -3,7 +3,52 @@
  *
  * Press sw0 to begin sampling; samples taken from sw1; pulse written to led0.
  *
- * TODO: document pseudocode.
+ * gatePeriod, blinkTime :: Duration
+ *
+ * main :: SSM ()
+ * main = do
+ *   gate <- extIn Event "sw0"
+ *   signal <- extIn Event "sw1"
+ *   (led_ctl, led_handler)  <- extOut Bool "led0"
+ *   freq <- sv U64 0
+ *   fork [ freq_count gate signal freq
+ *        , freq_mime freq led_ctl
+ *        , led_handler
+ *        , one_shot freq led_ctl
+ *        ]
+ *
+ * freq_count :: Ref Event -> Ref Event -> Ref Bool -> SSM ()
+ * freq_count gate signal freq = do
+ *   count <- var U64 0
+ *   wake <- sv event ()
+ *   while True $ do
+ *     while True $ do
+ *       when (eventOn gate) break
+ *       wait [gate]
+ *     count <~ if eventOn signal then 1 else 0
+ *     after gatePeriod wake <~ ()
+ *     while True $ do
+ *       wait [signal, wake]
+ *       when (eventOn wake) break
+ *       count <~ deref count + 1
+ *     freq <~ deref count * seconds / gatePeriod
+ *
+ * freq_mime :: Ref U64 -> Ref Bool -> SSM ()
+ * freq_mime freq led_ctl = do
+ *   wake <- sv event ()
+ *   while True $ do
+ *     when (deref freq > 0) $ do
+ *       led_ctl <~ True
+ *       after (sec 1 / deref freq) wake <~ ()
+ *     wait [freq, wake]
+ *
+ * one_shot :: Ref U64 -> Ref Bool -> SSM ()
+ * one_shot freq led_ctl = do
+ *   while True $ do
+ *     wait [led_ctl]
+ *     let f     = deref freq
+ *         delay = if f > 0 then blinkTime `min` (sec 1 / f / 2) else blinkTime
+ *     when (deref led_ctl) $ after delay led_ctl <~ False
  */
 #include "ssm-platform.h"
 
@@ -69,13 +114,13 @@ typedef struct {
   ssm_u64_t *freq;
 
   struct ssm_trigger trig1;
-} act_blinker_t;
+} act_one_shot_t;
 
-struct ssm_act *enter_blinker(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_one_shot(struct ssm_act *caller, ssm_priority_t priority,
                               ssm_depth_t depth, ssm_bool_t *led_ctl,
                               ssm_u64_t *freq);
 
-void step_blinker(struct ssm_act *actg);
+void step_one_shot(struct ssm_act *actg);
 
 struct ssm_act *enter_main(struct ssm_act *caller, ssm_priority_t priority,
                            ssm_depth_t depth) {
@@ -104,6 +149,10 @@ void step_main(struct ssm_act *actg) {
     if (actg->depth < 0)
       SSM_THROW(SSM_EXHAUSTED_PRIORITY);
 
+    ssm_activate(enter_out_handler(
+        actg, actg->priority + 2 * (1 << actg->depth - 2), actg->depth - 2,
+        &acts->led_ctl, NULL, DT_GPIO_DEV(led0)));
+
     ssm_activate(enter_freq_count(
         actg, actg->priority + 0 * (1 << actg->depth - 2), actg->depth - 2,
         &acts->gate, &acts->signal, &acts->freq));
@@ -112,13 +161,13 @@ void step_main(struct ssm_act *actg) {
                                  actg->priority + 1 * (1 << actg->depth - 2),
                                  actg->depth - 2, &acts->freq, &acts->led_ctl));
 
+    ssm_activate(enter_one_shot(actg,
+                               actg->priority + 3 * (1 << actg->depth - 2),
+                               actg->depth - 2, &acts->led_ctl, &acts->freq));
+
     ssm_activate(enter_out_handler(
         actg, actg->priority + 2 * (1 << actg->depth - 2), actg->depth - 2,
         &acts->led_ctl, NULL, DT_GPIO_DEV(led0)));
-
-    ssm_activate(enter_blinker(actg,
-                               actg->priority + 3 * (1 << actg->depth - 2),
-                               actg->depth - 2, &acts->led_ctl, &acts->freq));
 
     actg->pc = 1;
     return;
@@ -198,8 +247,6 @@ void step_freq_count(struct ssm_act *actg) {
         acts->count++;
       }
 
-      // FIXME: Zephyr doesn't seem to support FP arith by default, so this is
-      // pretty inaccurate for low frequencies due to rounding errors.
       ssm_time_t freq = acts->count * SSM_SECOND / GATE_PERIOD;
 
       SSM_DEBUG_PRINT("Count: %u\r\n", acts->count);
@@ -261,21 +308,21 @@ void step_freq_mime(struct ssm_act *actg) {
   ssm_leave(actg, sizeof(act_freq_count_t));
 }
 
-struct ssm_act *enter_blinker(struct ssm_act *caller, ssm_priority_t priority,
+struct ssm_act *enter_one_shot(struct ssm_act *caller, ssm_priority_t priority,
                               ssm_depth_t depth, ssm_bool_t *led_ctl,
                               ssm_u64_t *freq) {
 
   struct ssm_act *actg =
-      ssm_enter(sizeof(act_blinker_t), step_blinker, caller, priority, depth);
-  act_blinker_t *acts = container_of(actg, act_blinker_t, act);
+      ssm_enter(sizeof(act_one_shot_t), step_one_shot, caller, priority, depth);
+  act_one_shot_t *acts = container_of(actg, act_one_shot_t, act);
   acts->led_ctl = led_ctl;
   acts->freq = freq;
   acts->trig1.act = actg;
   return actg;
 }
 
-void step_blinker(struct ssm_act *actg) {
-  act_blinker_t *acts = container_of(actg, act_blinker_t, act);
+void step_one_shot(struct ssm_act *actg) {
+  act_one_shot_t *acts = container_of(actg, act_one_shot_t, act);
   switch (actg->pc) {
   case 0:;
     while (true) {
@@ -289,7 +336,7 @@ void step_blinker(struct ssm_act *actg) {
               ? MIN(BLINK_TIME, SSM_SECOND / acts->freq->value / 2)
               : BLINK_TIME;
       SSM_DEBUG_PRINT(
-          "Blinker [%llu]: received input, turning off in %llu at [%llu]\r\n",
+          "one_shot [%llu]: received input, turning off in %llu at [%llu]\r\n",
           ssm_now(), delay, ssm_now() + delay);
       if (acts->led_ctl->value)
         ssm_later_bool(acts->led_ctl, ssm_now() + delay, false);
