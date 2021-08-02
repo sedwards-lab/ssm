@@ -73,13 +73,13 @@ void step_out_handler(ssm_act_t *actg) {
     ssm_sensitize(&acts->ref_led->sv, &acts->trigger1);
     if (acts->ref_off) {
       acts->trigger2.act = actg;
-      ssm_sensitize(acts->ref_off, &acts->trigger2);
+      ssm_sensitize(&acts->ref_off->sv, &acts->trigger2);
     }
     actg->pc = 1;
     return;
 
   case 1:
-    if (acts->ref_off && ssm_event_on(acts->ref_off))
+    if (acts->ref_off && ssm_event_on(&acts->ref_off->sv))
       goto leave;
 
     gpio_pin_set(acts->port, acts->pin, acts->ref_led->value);
