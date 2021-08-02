@@ -291,7 +291,8 @@ void step_blinker(struct ssm_act *actg) {
       SSM_DEBUG_PRINT(
           "Blinker [%llu]: received input, turning off in %llu at [%llu]\r\n",
           ssm_now(), delay, ssm_now() + delay);
-      ssm_later_bool(acts->led_ctl, ssm_now() + delay, false);
+      if (acts->led_ctl->value)
+        ssm_later_bool(acts->led_ctl, ssm_now() + delay, false);
     }
   default:
     break;
