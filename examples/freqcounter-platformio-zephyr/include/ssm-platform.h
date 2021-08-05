@@ -12,7 +12,9 @@ extern struct ssm_act *(*ssm_entry_point)(struct ssm_act *, ssm_priority_t,
   if (!(cond))                                                                 \
   printk(__VA_ARGS__), exit(1)
 
-#define SSM_DEBUG_PRINT(...) printk(__VA_ARGS__)
+/* #define SSM_DEBUG_PRINT(...) printk(__VA_ARGS__) */
+
+#define SSM_DEBUG_PRINT(...) do; while(0)
 
 /* "Disable" trace-related stuff. */
 #define SSM_DEBUG_TRACE(...)                                                   \

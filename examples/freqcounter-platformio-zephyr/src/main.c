@@ -47,22 +47,16 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
     SSM_DEBUG_PRINT(":: before tick, [now: %016llx] [next: %016llx] (ctr: %016llx)\r\n",
            ssm_now(), ssm_next_event_time(), timer64_read(ssm_timer_dev));
 
-    /* SSM_DEBUG_ASSERT(ssm_next_event_time() < timer64_read(ssm_timer_dev), */
-    /*          "SSM logical time is attempting to race past wallclock time\r\n"); */
-
     ssm_tick();
 
-    SSM_DEBUG_ASSERT(ssm_now() < timer64_read(ssm_timer_dev),
-             "After tick, SSM logical time raced past wallclock time\r\n");
+    ssm_time_t time = timer64_read(ssm_timer_dev);
+    SSM_DEBUG_ASSERT(ssm_now() < time,
+             "After tick, SSM logical time raced past wallclock time:\r\n%llx\r\n%llx\r\n", ssm_now(), time);
 
     SSM_DEBUG_PRINT(":: after tick, [now: %016llx] [next: %016llx] (ctr: %016llx)\r\n",
            ssm_now(), ssm_next_event_time(), timer64_read(ssm_timer_dev));
 
     ssm_time_t wake = ssm_next_event_time();
-
-    if (wake < timer64_read(ssm_timer_dev))
-      /* We've already missed the next time; skip alarm and try to catch up */
-      continue;
 
     if (wake != SSM_NEVER) {
       SSM_DEBUG_PRINT(":: setting alarm for [wake: %016llx]\r\n", wake);
@@ -120,6 +114,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
       case SSM_EXT_INPUT: // Received external input
         SSM_DEBUG_PRINT(":: received SSM_EXT_INPUT [time: %016llx] (ctr: %016llx)\r\n",
                msg.time, timer64_read(ssm_timer_dev));
+        SSM_DEBUG_ASSERT(ssm_now() < msg.time,
+            "Trying to schedule earlier time than now\r\nnow:  %llx\r\ntime: %llx\r\n", ssm_now(), msg.time);
         ssm_later_event(msg.sv, msg.time);
         continue;
       }
