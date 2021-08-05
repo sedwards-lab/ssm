@@ -1,22 +1,23 @@
 #include "timer64.h"
-
-#define U1 ((uint32_t)0x1)
+#include <stdlib.h>
 
 #define TIMER64_LOGICAL_BITS 31
 #define TIMER64_TOTAL_BITS (TIMER64_LOGICAL_BITS + 1)
 
-#define TIMER64_LO_PARITY_BIT(ctr) (!!((ctr) & (U1 << TIMER64_LOGICAL_BITS)))
-#define TIMER64_HI_PARITY_BIT(mtk) ((mtk)&U1)
+#define TIMER64_LO_PARITY_BIT(ctr) (!!((ctr) & (0x1u << TIMER64_LOGICAL_BITS)))
+#define TIMER64_HI_PARITY_BIT(mtk) ((mtk)&0x1u)
 
-#define TIMER64_LO_MSB(ctr) (!!((ctr) << (TIMER64_LOGICAL_BITS - 1)))
+#define TIMER64_LO_MSB(ctr) (!!((ctr) & (0x1u << (TIMER64_LOGICAL_BITS - 1))))
 
 #define TIMER64_HI_SHIFT(hi) (((uint64_t)(hi)) << TIMER64_LOGICAL_BITS)
-#define TIMER64_LO_MASK(lo) ((lo) & ((U1 << TIMER64_LOGICAL_BITS) - 1))
+#define TIMER64_LO_MASK(lo) ((lo) & ((0x1u << TIMER64_LOGICAL_BITS) - 1))
 
 #define TIMER64_COMBINE(hi, lo) (TIMER64_HI_SHIFT(hi) + TIMER64_LO_MASK(lo))
 
-#define TIMER64_TOP ((U1 << (TIMER64_TOTAL_BITS - 1)) | ((U1 << (TIMER64_TOTAL_BITS - 1)) - 1))
-#define TIMER64_MID (U1 << TIMER64_LOGICAL_BITS)
+#define TIMER64_TOP                                                            \
+  ((0x1u << (TIMER64_TOTAL_BITS - 1)) |                                        \
+   ((0x1u << (TIMER64_TOTAL_BITS - 1)) - 1))
+#define TIMER64_MID (0x1u << TIMER64_LOGICAL_BITS)
 #define TIMER64_GUARD (TIMER64_TOP / 2)
 
 enum { TIMER64_MID_ALARM, TIMER64_USER_ALARM };
@@ -24,9 +25,8 @@ enum { TIMER64_MID_ALARM, TIMER64_USER_ALARM };
 static volatile uint32_t macroticks;
 
 uint64_t timer64_read(const struct device *dev) {
-  uint32_t ctr;
-  uint32_t mtk0;
-  uint32_t mtk1;
+
+  uint32_t ctr, mtk0, mtk1;
 
   mtk0 = macroticks;
 
@@ -86,11 +86,14 @@ int timer64_init(const struct device *dev) {
   int err;
   struct counter_top_cfg top_cfg;
 
-  __ASSERT(dev, "dev was a null pointer\r\n");
-  __ASSERT(TIMER64_TOP < counter_get_max_top_value(dev),
-           "Top value too large\r\n");
-  __ASSERT(2 <= counter_get_num_of_channels(dev),
-           "Insufficient alarm channels\r\n");
+  if (!dev)
+    printk("dev was a null pointer\r\n"), exit(1);
+  if (!(TIMER64_TOP <= counter_get_max_top_value(dev)))
+    printk("Top value too large top %x > max top %x\r\n", TIMER64_TOP,
+           counter_get_max_top_value(dev)),
+        exit(1);
+  if (!(2 <= counter_get_num_of_channels(dev)))
+    printk("Insufficient alarm channels\r\n"), exit(1);
 
   printk("timer will run at %d Hz\r\n", counter_get_frequency(dev));
   printk("timer will wraparound at %08x ticks\r\n", TIMER64_TOP);
