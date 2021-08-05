@@ -2,6 +2,21 @@
  * A frequency counter with a fixed gate period.
  *
  * Samples taken from sw1. Reports frequency to serial console.
+ *
+ * freq_count signal = do
+ *   count <- var u32 -- How to write this
+ *   gate <- var ()
+ *   after 1s, gate <~ ()
+ *
+ *   while True $ do
+ *     if event_on gate then $ do
+ *       print count
+ *       count <~ if event_on signal then 1 else 0
+ *       after 1s, gate <~ ()
+ *     else $ do
+ *       count++
+ *
+ *     wait [gate, signal]
  */
 #include "ssm-platform.h"
 
@@ -94,10 +109,10 @@ struct ssm_act *enter_freq_count(struct ssm_act *caller,
 
 void step_freq_count(struct ssm_act *actg) {
   act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
-
   switch (actg->pc) {
-  case 0:; // Gate not active
+  case 0:;
     SSM_DEBUG_PRINT("Starting freq_counter with period: %llu\r\n", GATE_PERIOD);
+
     ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
 
     while (true) {
@@ -107,12 +122,14 @@ void step_freq_count(struct ssm_act *actg) {
         printk("Frequency: %llu Hz\r\n",
                acts->count * SSM_SECOND / acts->gate_period);
 
-        acts->count = 0;
-        ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
-      }
+        // Inclusive of gate period start, exclusive of gate period end
+        acts->count = ssm_event_on(&acts->signal->sv) ? 1 : 0;
 
-      // Inclusive of gate period start, exclusive of gate period end
-      acts->count += ssm_event_on(&acts->signal->sv) ? 1 : 0;
+        // Reset internal gate signal
+        ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
+      } else {
+        acts->count++;
+      }
 
       SSM_DEBUG_PRINT("freq_count [%llu]: signal: %u, count: %u\r\n", ssm_now(),
                       ssm_event_on(&acts->signal->sv), acts->count);
@@ -121,6 +138,7 @@ void step_freq_count(struct ssm_act *actg) {
       ssm_sensitize(&acts->gate.sv, &acts->trig2);
       actg->pc = 1;
       return;
+
     case 1:;
       ssm_desensitize(&acts->trig2);
       ssm_desensitize(&acts->trig1);
