@@ -1,29 +1,30 @@
 #include "timer64.h"
 #include <stdlib.h>
 
-#define TIMER64_LOGICAL_BITS 23
+#define TIMER64_LOGICAL_BITS 31
 #define TIMER64_TOTAL_BITS (TIMER64_LOGICAL_BITS + 1)
 
-#define TIMER64_LO_PARITY_BIT(ctr) (!!((ctr) & (0x1 << TIMER64_LOGICAL_BITS)))
-#define TIMER64_HI_PARITY_BIT(mtk) ((mtk)&0x1)
+#define TIMER64_LO_PARITY_BIT(ctr) (!!((ctr) & (0x1u << TIMER64_LOGICAL_BITS)))
+#define TIMER64_HI_PARITY_BIT(mtk) ((mtk)&0x1u)
 
-#define TIMER64_LO_MSB(ctr) (!!((ctr) & (0x1 << (TIMER64_LOGICAL_BITS - 1))))
+#define TIMER64_LO_MSB(ctr) (!!((ctr) & (0x1u << (TIMER64_LOGICAL_BITS - 1))))
 
 #define TIMER64_HI_SHIFT(hi) (((uint64_t)(hi)) << TIMER64_LOGICAL_BITS)
-#define TIMER64_LO_MASK(lo) ((lo) & ((0x1 << TIMER64_LOGICAL_BITS) - 1))
+#define TIMER64_LO_MASK(lo) ((lo) & ((0x1u << TIMER64_LOGICAL_BITS) - 1))
 
 #define TIMER64_COMBINE(hi, lo) (TIMER64_HI_SHIFT(hi) + TIMER64_LO_MASK(lo))
 
 #define TIMER64_TOP                                                            \
-  ((0x1 << (TIMER64_TOTAL_BITS - 1)) | ((0x1 << (TIMER64_TOTAL_BITS - 1)) - 1))
-#define TIMER64_MID (0x1 << TIMER64_LOGICAL_BITS)
+  ((0x1u << (TIMER64_TOTAL_BITS - 1)) |                                        \
+   ((0x1u << (TIMER64_TOTAL_BITS - 1)) - 1))
+#define TIMER64_MID (0x1u << TIMER64_LOGICAL_BITS)
 #define TIMER64_GUARD (TIMER64_TOP / 2)
 
 enum { TIMER64_MID_ALARM, TIMER64_USER_ALARM };
 
 static volatile uint32_t macroticks;
 
-uint64_t timer64_read(const struct device *dev){
+uint64_t timer64_read(const struct device *dev) {
 
   uint32_t ctr, mtk0, mtk1;
 
