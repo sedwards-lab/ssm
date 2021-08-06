@@ -6,6 +6,8 @@
 #include "ssm-platform.h"
 #include "timer64.h"
 
+LOG_MODULE_REGISTER(ssm_io);
+
 #if !DT_NODE_HAS_STATUS(DT_ALIAS(led0), okay)
 #error "led0 device alias not defined"
 #endif

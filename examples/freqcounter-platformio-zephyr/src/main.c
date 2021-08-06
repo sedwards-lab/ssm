@@ -12,6 +12,8 @@
 #include "ssm-platform.h"
 #include "timer64.h"
 
+LOG_MODULE_REGISTER(main);
+
 #if !DT_NODE_HAS_STATUS(DT_ALIAS(ssm_timer), okay)
 #error "ssm-timer device is not supported on this board"
 #endif
@@ -149,7 +151,7 @@ void main() {
 
 /** Override ssm_throw function with some platform-specific printing. */
 void ssm_throw(int reason, const char *file, int line, const char *func) {
-  printk("ssm_throw: %d (%s:%d in %s)\n", reason, file, line, func);
-  printk("%016llx/%016llx\r\n", ssm_now(), timer64_read(ssm_timer_dev));
+  LOG_ERR("ssm_throw: %d (%s:%d in %s)\n", reason, file, line, func);
+  LOG_ERR("%016llx/%016llx\r\n", ssm_now(), timer64_read(ssm_timer_dev));
   exit(reason);
 }

@@ -1,6 +1,10 @@
 #include "timer64.h"
 #include <stdlib.h>
 
+#include <logging/log.h>
+
+LOG_MODULE_REGISTER(timer64);
+
 #define TIMER64_LOGICAL_BITS 31
 #define TIMER64_TOTAL_BITS (TIMER64_LOGICAL_BITS + 1)
 
@@ -55,9 +59,9 @@ static void mid_overflow_handler(const struct device *dev, uint8_t chan,
                                  uint32_t ticks, void *user_data) {
   uint32_t ctr;
   counter_get_value(dev, &ctr);
-  printk("\r\n%%%%%%%%%%%% mid overflow: macroticks %d -> %d (ctr: %08x) "
-         "%%%%%%%%%%%%\r\n",
-         macroticks, macroticks + 1, ctr);
+  LOG_INF("\r\n%%%%%%%%%%%% mid overflow: macroticks %d -> %d (ctr: %08x) "
+          "%%%%%%%%%%%%\r\n",
+          macroticks, macroticks + 1, ctr);
   incr_macroticks(dev);
 }
 
@@ -74,9 +78,9 @@ static void overflow_handler(const struct device *dev, void *user_data) {
 
   uint32_t ctr;
   counter_get_value(dev, &ctr);
-  printk("\r\n%%%%%%%%%%%% Full overflow: macroticks %d -> %d (ctr: %08x) "
-         "%%%%%%%%%%%%\r\n",
-         macroticks, macroticks + 1, ctr);
+  LOG_INF("\r\n%%%%%%%%%%%% Full overflow: macroticks %d -> %d (ctr: %08x) "
+          "%%%%%%%%%%%%\r\n",
+          macroticks, macroticks + 1, ctr);
 
   incr_macroticks(dev);
   schedule_mid_overflow_handler(dev);
@@ -86,17 +90,22 @@ int timer64_init(const struct device *dev) {
   int err;
   struct counter_top_cfg top_cfg;
 
-  if (!dev)
-    printk("dev was a null pointer\r\n"), exit(1);
-  if (!(TIMER64_TOP <= counter_get_max_top_value(dev)))
-    printk("Top value too large top %x > max top %x\r\n", TIMER64_TOP,
-           counter_get_max_top_value(dev)),
-        exit(1);
-  if (!(2 <= counter_get_num_of_channels(dev)))
-    printk("Insufficient alarm channels\r\n"), exit(1);
+  if (!dev) {
+    LOG_ERR("dev was a null pointer\r\n");
+    exit(1);
+  }
+  if (!(TIMER64_TOP <= counter_get_max_top_value(dev))) {
+    LOG_ERR("Top value too large top %x > max top %x\r\n", TIMER64_TOP,
+            counter_get_max_top_value(dev));
+    exit(1);
+  }
+  if (!(2 <= counter_get_num_of_channels(dev))) {
+    LOG_ERR("Insufficient alarm channels\r\n");
+    exit(1);
+  }
 
-  printk("timer will run at %d Hz\r\n", counter_get_frequency(dev));
-  printk("timer will wraparound at %08x ticks\r\n", TIMER64_TOP);
+  LOG_INF("timer will run at %d Hz\r\n", counter_get_frequency(dev));
+  LOG_INF("timer will wraparound at %08x ticks\r\n", TIMER64_TOP);
 
   macroticks = 0;
 

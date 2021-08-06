@@ -4,6 +4,7 @@
 #include <drivers/gpio.h>
 #include <ssm.h>
 #include <sys/__assert.h>
+#include <logging/log.h>
 
 extern struct ssm_act *(*ssm_entry_point)(struct ssm_act *, ssm_priority_t,
                                           ssm_depth_t);
@@ -14,7 +15,8 @@ extern struct ssm_act *(*ssm_entry_point)(struct ssm_act *, ssm_priority_t,
 
 /* #define SSM_DEBUG_PRINT(...) printk(__VA_ARGS__) */
 
-#define SSM_DEBUG_PRINT(...) do; while(0)
+/* #define SSM_DEBUG_PRINT(...) do; while(0) */
+#define SSM_DEBUG_PRINT(...) LOG_DBG(__VA_ARGS__)
 
 /* "Disable" trace-related stuff. */
 #define SSM_DEBUG_TRACE(...)                                                   \
