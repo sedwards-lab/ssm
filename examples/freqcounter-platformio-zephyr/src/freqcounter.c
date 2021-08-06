@@ -20,6 +20,8 @@
  */
 #include "ssm-platform.h"
 
+LOG_MODULE_REGISTER(freqcounter);
+
 #define GATE_PERIOD ((ssm_time_t)1 * SSM_SECOND)
 
 typedef struct {
@@ -107,8 +109,12 @@ struct ssm_act *enter_freq_count(struct ssm_act *caller,
   return actg;
 }
 
+extern uint64_t rescheduled;
+extern uint64_t scheduled;
+
 void step_freq_count(struct ssm_act *actg) {
   act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
+
   switch (actg->pc) {
   case 0:;
     SSM_DEBUG_PRINT("Starting freq_counter with period: %llu\r\n", GATE_PERIOD);
@@ -119,13 +125,27 @@ void step_freq_count(struct ssm_act *actg) {
       if (ssm_event_on(&acts->gate.sv)) {
         SSM_DEBUG_PRINT("freq_count [%llu]: Received gate...\r\n", ssm_now());
 
-        printk("Frequency: %u Hz\r\n", acts->count);
+        LOG_INF("Frequency: %u Hz\r\n", acts->count);
+        LOG_INF("Scheduled: %llu Hz\r\n", scheduled);
+        LOG_INF("Rescheduled: %llu Hz\r\n", rescheduled);
+        LOG_INF("Newly scheduled: %llu Hz\r\n", scheduled - rescheduled);
 
-        // Inclusive of gate period start, exclusive of gate period end
-        acts->count = ssm_event_on(&acts->signal->sv) ? 1 : 0;
+        scheduled = rescheduled = 0;
+
+        ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
+
+        ssm_sensitize(&acts->gate.sv, &acts->trig2);
+        actg->pc = 1;
+        return;
+
+      case 1:; // Off-cycle;
+        ssm_desensitize(&acts->trig2);
 
         // Reset internal gate signal
         ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
+
+        // Inclusive of gate period start, exclusive of gate period end
+        acts->count = ssm_event_on(&acts->signal->sv) ? 1 : 0;
       } else {
         acts->count++;
       }
@@ -135,10 +155,10 @@ void step_freq_count(struct ssm_act *actg) {
 
       ssm_sensitize(&acts->signal->sv, &acts->trig1);
       ssm_sensitize(&acts->gate.sv, &acts->trig2);
-      actg->pc = 1;
+      actg->pc = 2;
       return;
 
-    case 1:;
+    case 2:;
       ssm_desensitize(&acts->trig2);
       ssm_desensitize(&acts->trig1);
     }
