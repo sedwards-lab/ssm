@@ -121,11 +121,13 @@ leave:
 static void ssm_gpio_input_handler(const struct device *port,
                                    struct gpio_callback *cb,
                                    gpio_port_pins_t pins) {
-  static ssm_env_event_t timeout_msg = {.type = SSM_EXT_INPUT};
+  static ssm_env_event_t timeout_msg;
   timeout_msg.time = timer64_read(ssm_timer_dev);
   timeout_msg.sv = container_of(cb, ssm_input_event_t, cb)->sv;
 
-  k_msgq_put(&ssm_env_queue, &timeout_msg, K_NO_WAIT);
+  if (k_msgq_put(&ssm_env_queue, &timeout_msg, K_NO_WAIT))
+    LOG_ERR("Dropped input event: [%016llx]\r\n", timeout_msg.time);
+  k_sem_give(&tick_sem);
 }
 
 void bind_input_handler(ssm_input_event_t *in, ssm_event_t *sv,

@@ -109,9 +109,6 @@ struct ssm_act *enter_freq_count(struct ssm_act *caller,
   return actg;
 }
 
-extern uint64_t rescheduled;
-extern uint64_t scheduled;
-
 void step_freq_count(struct ssm_act *actg) {
   act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
 
@@ -126,11 +123,6 @@ void step_freq_count(struct ssm_act *actg) {
         SSM_DEBUG_PRINT("freq_count [%llu]: Received gate...\r\n", ssm_now());
 
         LOG_INF("Frequency: %u Hz\r\n", acts->count);
-        LOG_INF("Scheduled: %llu Hz\r\n", scheduled);
-        LOG_INF("Rescheduled: %llu Hz\r\n", rescheduled);
-        LOG_INF("Newly scheduled: %llu Hz\r\n", scheduled - rescheduled);
-
-        scheduled = rescheduled = 0;
 
         ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
 
