@@ -1,0 +1,26 @@
+### 2021-08-06 19:16:02
+
+Timer-related things run at NORDIC_DEFAULT_IRQ_PRIORITY, i.e. 1, while GPIO is
+configured to run at priority 5. So GPIO can be preempted by timers.
+
+This is all configured in the device tree.
+
+Relevant paths:
+
+- dts/arm/nordic/nrf_common.dtsi: where default irq priority is set.
+- dts/arm/nordic/nrf52840.dtsi: where timer and gpio priorities are set.
+
+We can probably assume that ISRs cannot preempt themselves.
+
+QUES: can we rely on this? Considered asking in Slack, but deleted message
+because it wasn't a very concrete question. Better to implement something first.
+
+TODO: figure out how to configure the priorities in the device overlay. In
+particular, what happens if we invert the priorities?
+
+QUES: explore workqueue vs msgq. Why use the workqueue over the msgq?
+
+QUES: what are ZLIs? Seems to promise better performance, but how much better?
+Are they easy to configure?
+
+TODO: implement alarm chaining to support setting 64-bit alarms.
