@@ -69,16 +69,17 @@ ssm_act_t *enter_out_handler(ssm_act_t *parent, ssm_priority_t priority,
 /**** Zephyr event queue ****/
 
 /** Types of events from the environment */
-typedef enum { SSM_TIMEOUT, SSM_EXT_INPUT } ssm_event_type_t;
+/* typedef enum { SSM_TIMEOUT, SSM_EXT_INPUT } ssm_event_type_t; */
 
 /** An event from the environment, e.g., a timeout */
 typedef struct {
-  ssm_event_type_t type;
+  /* ssm_event_type_t type; */
   ssm_time_t time;
   ssm_event_t *sv; // TODO: handle values
 } ssm_env_event_t;
 
 /** The queue */
 extern struct k_msgq ssm_env_queue;
+extern struct k_sem tick_sem;
 
 #endif /* _SSM_PLATFORM_H */
