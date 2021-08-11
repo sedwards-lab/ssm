@@ -15,7 +15,7 @@ LOG_MODULE_REGISTER(main);
 
 #define SSM_TICK_STACKSIZE 4096
 #define SSM_TICK_PRIORITY 7
-#define SSM_INPUT_PBUF_SIZE 8192
+#define SSM_INPUT_PBUF_SIZE 4096
 
 const struct device *ssm_timer_dev = 0;
 
@@ -33,7 +33,23 @@ uint32_t packet_get_len(union mpsc_pbuf_generic *packet) {
   return sizeof(ssm_input_packet_t);
 }
 
+uint32_t input_count = 0;
 uint32_t dropped = 0;
+#define LOG_DROP_NOTIF_PERIOD (SSM_SECOND * 2)
+
+static void log_dropped(const struct device *dev, uint8_t chan, uint32_t ticks,
+                        void *user_data) {
+  if (dropped) {
+    LOG_WRN("Dropped %u packets\r\n", dropped);
+    dropped = 0;
+  }
+  LOG_INF("Raw input count: %u (%lu/second)\r\n", input_count, input_count / (LOG_DROP_NOTIF_PERIOD / SSM_SECOND));
+  input_count = 0;
+  if (timer64_set_alarm(ssm_timer_dev, 1,
+                        timer64_read(ssm_timer_dev) + LOG_DROP_NOTIF_PERIOD,
+                        log_dropped, NULL))
+    LOG_ERR("could not set drop log alarm");
+}
 
 /**
  * Thread responsible for processing events (messages), calling ssm_tick(), and
@@ -46,11 +62,18 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
       .buf = input_pbuf_data,
       .size = SSM_INPUT_PBUF_SIZE,
       .get_wlen = packet_get_len,
-      .notify_drop = NULL, // not necessary as long as we don't use overwrite policy
+      .notify_drop =
+          NULL, // not necessary as long as we don't use overwrite policy
       .flags = 0,
   };
 
   mpsc_pbuf_init(&input_pbuf, &input_pbuf_cfg);
+  {
+    if (timer64_set_alarm(ssm_timer_dev, 1,
+                          timer64_read(ssm_timer_dev) + LOG_DROP_NOTIF_PERIOD,
+                          log_dropped, NULL))
+      LOG_ERR("could not set drop log alarm");
+  }
 
   ssm_program_initialize();
 
@@ -65,14 +88,6 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
     /* ssm_time_t _wall_time = */
     /*     timer64_read(ssm_timer_dev); // For debbugging/testing */
 
-    {
-      uint32_t d = dropped;
-      if (d && d > 2000) {
-        LOG_ERR("Dropped at least %u packets\r\n", dropped);
-        dropped = 0;
-      }
-    }
-
     /* { // Invariant: now < wall time */
     /*   SSM_DEBUG_ASSERT(ssm_now() < _wall_time, */
     /*                    "SSM logical time raced past wallclock time:\r\n" */
@@ -83,7 +98,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
     ssm_time_t next_time = ssm_next_event_time();
 
     if (input_packet) {
-      ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1);
+      ssm_time_t packet_time = TIMER64_CALC(
+          input_packet->tick, input_packet->mtk0, input_packet->mtk1);
       /* { // Invariant: input time < wall time, due to monotonicity of timer */
       /*   SSM_DEBUG_ASSERT(packet_time < _wall_time, */
       /*                    "Obtained input from the future:\r\n" */
@@ -99,7 +115,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
 
         /* if (input_packet) { // Invariant: input time' <= input time */
-        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1); */
+        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick,
+         * input_packet->mtk0, input_packet->mtk1); */
         /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, */
         /*                    "Inputs queued out of order:\r\n" */
         /*                    "input': %016llx\r\n" */
@@ -128,7 +145,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
           SSM_DEBUG_PRINT(":: setting alarm for [next_time: %016llx]\r\n",
                           next_time);
 
-          int err = timer64_set_alarm(ssm_timer_dev, next_time,
+          int err = timer64_set_alarm(ssm_timer_dev, 0, next_time,
                                       send_timeout_event, NULL);
 
           switch (err) {
@@ -151,7 +168,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
           }
         }
         // Cancel any potential pending alarm if it hasn't gone off yet.
-        timer64_cancel_alarm(ssm_timer_dev);
+        timer64_cancel_alarm(ssm_timer_dev, 0);
 
         // It's possible that the alarm had gone off before we cancelled it; we
         // make sure that its sem_give doesn't stick around and cause premature
@@ -163,7 +180,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
 
         /* if (input_packet) { // Invariant: input time' <= input time */
-        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1); */
+        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick,
+         * input_packet->mtk0, input_packet->mtk1); */
         /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, ""); */
         /*   _last_input_time = packet_time; */
         /* } */

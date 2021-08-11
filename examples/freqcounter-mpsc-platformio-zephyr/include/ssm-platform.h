@@ -66,5 +66,6 @@ typedef struct {
 extern struct k_sem tick_sem;
 extern struct mpsc_pbuf_buffer input_pbuf;
 extern uint32_t dropped;
+extern uint32_t input_count;
 
 #endif /* _SSM_PLATFORM_H */

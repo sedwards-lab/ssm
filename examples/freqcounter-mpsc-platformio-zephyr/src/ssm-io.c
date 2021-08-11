@@ -153,6 +153,7 @@ static void input_event_handler(const struct device *port,
   } else {
     dropped++;
   }
+  input_count++;
   /* irq_unlock(key); */
 }
 

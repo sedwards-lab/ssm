@@ -5,7 +5,7 @@
 
 LOG_MODULE_REGISTER(timer64);
 
-enum { TIMER64_MID_ALARM, TIMER64_USER_ALARM };
+enum { TIMER64_MID_ALARM, TIMER64_USER_ALARM, TIMER64_USER_PERIOD_ALARM };
 
 volatile uint32_t macroticks;
 
@@ -97,7 +97,7 @@ int timer64_init(const struct device *dev) {
 
 int timer64_start(const struct device *dev) { return counter_start(dev); }
 
-int timer64_set_alarm(const struct device *dev, uint64_t wake_time,
+int timer64_set_alarm(const struct device *dev, uint8_t channel, uint64_t wake_time,
                       counter_alarm_callback_t cb, void *user_data) {
   struct counter_alarm_cfg cfg;
   __ASSERT(wake_time - timer64_read(dev) > TIMER64_GUARD,
@@ -106,9 +106,9 @@ int timer64_set_alarm(const struct device *dev, uint64_t wake_time,
   cfg.ticks = wake_time & TIMER64_TOP;
   cfg.callback = cb;
   cfg.user_data = user_data;
-  return counter_set_channel_alarm(dev, TIMER64_USER_ALARM, &cfg);
+  return counter_set_channel_alarm(dev, TIMER64_USER_ALARM + channel, &cfg);
 }
 
-int timer64_cancel_alarm(const struct device *dev) {
-  return counter_cancel_channel_alarm(dev, TIMER64_USER_ALARM);
+int timer64_cancel_alarm(const struct device *dev, uint8_t channel) {
+  return counter_cancel_channel_alarm(dev, TIMER64_USER_ALARM + channel);
 }
