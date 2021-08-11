@@ -26,8 +26,6 @@ LOG_MODULE_REGISTER(freqcounter);
 
 typedef struct {
   struct ssm_act act;
-  ssm_event_t signal;
-  ssm_input_event_t sw1;
 } act_main_t;
 
 struct ssm_act *enter_main(struct ssm_act *caller, ssm_priority_t priority,
@@ -57,8 +55,6 @@ struct ssm_act *enter_main(struct ssm_act *caller, ssm_priority_t priority,
       ssm_enter(sizeof(act_main_t), step_main, caller, priority, depth);
   act_main_t *acts = container_of(actg, act_main_t, act);
 
-  ssm_initialize_event(&acts->signal);
-
   return actg;
 }
 
@@ -68,14 +64,13 @@ void step_main(struct ssm_act *actg) {
   switch (actg->pc) {
 
   case 0:;
-    bind_input_handler(&acts->sw1, &acts->signal, DT_GPIO_DEV(sw1));
 
     if (actg->depth < 0)
       SSM_THROW(SSM_EXHAUSTED_PRIORITY);
 
     ssm_activate(enter_freq_count(actg,
-                                  actg->priority + 1 * (1 << actg->depth - 1),
-                                  actg->depth - 1, &acts->signal, GATE_PERIOD));
+                                  actg->priority + 0 * (1 << actg->depth),
+                                  actg->depth, sw1, GATE_PERIOD));
     actg->pc = 1;
     return;
 
@@ -85,9 +80,6 @@ void step_main(struct ssm_act *actg) {
     break;
   }
 
-  unbind_input_handler(&acts->sw1);
-
-  ssm_unschedule(&acts->signal.sv);
   ssm_leave(actg, sizeof(act_main_t));
 }
 
@@ -161,5 +153,10 @@ void step_freq_count(struct ssm_act *actg) {
   ssm_leave(actg, sizeof(act_freq_count_t));
 }
 
-struct ssm_act *(*ssm_entry_point)(struct ssm_act *, ssm_priority_t,
-                                   ssm_depth_t) = enter_main;
+int ssm_program_initialize(void) {
+  initialize_static_input_device(&sw1->sv);
+
+  ssm_activate(enter_main(&ssm_top_parent, SSM_ROOT_PRIORITY, SSM_ROOT_DEPTH));
+
+  return 0;
+}

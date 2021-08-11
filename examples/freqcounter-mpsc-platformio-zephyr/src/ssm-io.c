@@ -21,6 +21,53 @@ LOG_MODULE_REGISTER(ssm_io);
 #error "sw0 device alias not defined"
 #endif
 
+/** My recreation of Zephyr 2.6's struct dt_spec */
+typedef struct {
+  const char *label;
+  gpio_pin_t pin;
+  gpio_flags_t flags;
+} gpio_device_t;
+
+/** Shorthand to create a gpio_device_t from a device id/alias */
+#define DT_GPIO_DEV(id)                                                        \
+  (gpio_device_t) {                                                            \
+    .label = DT_GPIO_LABEL(DT_ALIAS(id), gpios),                               \
+    .pin = DT_GPIO_PIN(DT_ALIAS(id), gpios),                                   \
+    .flags = DT_GPIO_FLAGS(DT_ALIAS(id), gpios)                                \
+  }
+
+/**
+ * Contains data used in for binding input to (event) variables.
+ * Must be persisted for as long that input is bound.
+ */
+typedef struct {
+  /* Statically initialized */
+  bool initialized;
+  const uint8_t index;
+
+  /* Statically initialized for static devices. We use a pointer here becuase
+   * multiple ssm_input_event_ts may point to the same hardware device.
+   */
+  gpio_device_t dev;
+
+  /* Can be statically initialized with some additional work */
+  ssm_event_t sv;
+
+  /* Should be initialized at runtime */
+  struct gpio_callback cb;
+  const struct device *port;
+
+} ssm_input_event_t;
+
+typedef struct {
+  bool initialized;
+  gpio_device_t dev;
+
+  ssm_bool_t sv;
+
+  const struct device *port;
+} ssm_output_bool_t;
+
 /**
  * OUTPUT: evaluated using an effect handler process.
  *
@@ -29,142 +76,153 @@ LOG_MODULE_REGISTER(ssm_io);
  * SSM process. When the bound SV is written to, the effect handler wakes up and
  * "evaluates" the effect by forwarding it to its bound GPIO pin.
  *
- * This current design also inclues a "killswitch", a pure (event type) SV that,
- * when written to, causes the effect handler to quit. The pointer passed in can
- * be a null pointer, but in that case the effect handler will never terminate
- * (and thus the program will never progrss past the fork statement where the
- * output device is created. Note that there is almost definitely a better way
- * to do resource management rather than like this (manually).
+ * FIXME: this design currently uses an egregious level of indirection because
+ * everything is kept in one data structure. I should push around some pointers
+ * to flatten things out a bit.
  */
 typedef struct {
   ssm_act_t act;
   ssm_trigger_t trigger1;
-  ssm_trigger_t trigger2;
-  ssm_bool_t *ref_led;
-  ssm_event_t *ref_off;
-  const struct device *port;
-  gpio_pin_t pin;
+  ssm_output_bool_t *out;
 } out_handler_act_t;
 
-ssm_stepf_t step_out_handler;
+static ssm_stepf_t step_out_handler;
 
-ssm_act_t *enter_out_handler(ssm_act_t *parent, ssm_priority_t priority,
-                             ssm_depth_t depth, ssm_bool_t *ref_led,
-                             ssm_event_t *ref_off, gpio_device_t dev) {
+static ssm_act_t *enter_out_handler(ssm_act_t *parent, ssm_priority_t priority,
+                                    ssm_depth_t depth, ssm_output_bool_t *out) {
 
+  int err;
   ssm_act_t *actg = ssm_enter(sizeof(out_handler_act_t), step_out_handler,
                               parent, priority, depth);
   out_handler_act_t *acts = container_of(actg, out_handler_act_t, act);
-  acts->ref_led = ref_led;
-  acts->ref_off = ref_off;
 
-  acts->port = device_get_binding(dev.label);
-  SSM_DEBUG_ASSERT(acts->port != 0, "device_get_binding failed");
-  acts->pin = dev.pin;
-  if (gpio_pin_configure(acts->port, acts->pin,
-                         GPIO_OUTPUT_ACTIVE | dev.flags) < 0)
-    SSM_DEBUG_ASSERT(0, "gpio_pin_configure failed");
+  out->port = device_get_binding(out->dev.label);
+  if (!out->port)
+    return NULL;
+
+  err = gpio_pin_configure(out->port, out->dev.pin,
+                           GPIO_OUTPUT_ACTIVE | out->dev.flags);
+  if (err)
+    return NULL;
+  gpio_pin_set(acts->out->port, acts->out->dev.pin, acts->out->sv.value);
+
+  acts->out = out;
+  ssm_initialize_bool(&out->sv);
   return actg;
 }
 
 /** Output effect handler process. */
-void step_out_handler(ssm_act_t *actg) {
+static void step_out_handler(ssm_act_t *actg) {
   out_handler_act_t *acts = container_of(actg, out_handler_act_t, act);
   switch (actg->pc) {
   case 0:
     acts->trigger1.act = actg;
-    ssm_sensitize(&acts->ref_led->sv, &acts->trigger1);
-    if (acts->ref_off) {
-      acts->trigger2.act = actg;
-      ssm_sensitize(&acts->ref_off->sv, &acts->trigger2);
-    }
+    ssm_sensitize(&acts->out->sv.sv, &acts->trigger1);
     actg->pc = 1;
     return;
 
   case 1:
-    if (acts->ref_off && ssm_event_on(&acts->ref_off->sv))
-      goto leave;
-
-    gpio_pin_set(acts->port, acts->pin, acts->ref_led->value);
+    gpio_pin_set(acts->out->port, acts->out->dev.pin, acts->out->sv.value);
     return;
   }
-leave:
+  // Unreachable
+
   // "Reset" the output device. This might not be applicable in all
   // circumstances, and will differ on the output device.
-  gpio_pin_set(acts->port, acts->pin, 0);
-
+  gpio_pin_set(acts->out->port, acts->out->dev.pin, 0);
   ssm_desensitize(&acts->trigger1);
-  if (acts->ref_off)
-    ssm_desensitize(&acts->trigger2);
   ssm_leave(actg, sizeof(out_handler_act_t));
 }
 
-/**
- * INPUT: received via events to a bound SV.
- *
- * The bind_input_handler function associates an input device with the given SV,
- * which registers a GPIO callback that inserts a timestamped event in the msgq
- * every time the device receives input.
- *
- * Note that Zephyr's API expects the function pointer for the input handler to
- * be persisted in some struct gpio_callback, whose memory the caller is
- * responsible for managing. This is because the callback is added as a node in
- * a singly-linked list of callbacks for the input device. By embedding the
- * struct gpio_callback within ssm_input_event_t, we may access other
- * callback-specific data in the input handler using container_of to reach the
- * other members of that struct, e.g., the SV pointer.
- *
- * The drawback of this approach is that, because the memory for the callback
- * is managed within the ssm_input_event_t, we also require the caller to
- * unbind_input_handler before freeing that memory, to avoid use-after-free
- * of the struct gpio_callback upon receiving input.
- */
-static void ssm_gpio_input_handler(const struct device *port,
-                                   struct gpio_callback *cb,
-                                   gpio_port_pins_t pins) {
+static void input_event_handler(const struct device *port,
+                                struct gpio_callback *cb,
+                                gpio_port_pins_t pins) {
+  /* unsigned int key = irq_lock(); // probably not necessary */
+  ssm_input_packet_t *input_packet = (ssm_input_packet_t *)mpsc_pbuf_alloc(
+      &input_pbuf, sizeof(ssm_input_packet_t), K_NO_WAIT);
 
-  unsigned int key = irq_lock();
-  ssm_input_packet_t *input_packet = (ssm_input_packet_t*)
-    mpsc_pbuf_alloc(&input_pbuf, sizeof(ssm_input_packet_t), K_NO_WAIT);
   if (input_packet) {
-    input_packet->time = timer64_read(ssm_timer_dev);
-    input_packet->sv = &container_of(cb, ssm_input_event_t, cb)->sv->sv;
+    // TODO: coerce the compiler into making one write instead of two
+    input_packet->input =
+        (input_info){.type = SSM_EVENT_T,
+                     .index = container_of(cb, ssm_input_event_t, cb)->index};
+    TIMER64_READ(ssm_timer_dev, &input_packet->tick, &input_packet->mtk0,
+                 &input_packet->mtk1);
     mpsc_pbuf_commit(&input_pbuf, (union mpsc_pbuf_generic *)input_packet);
     k_sem_give(&tick_sem);
   } else {
     dropped++;
   }
-  irq_unlock(key);
-
-/*   static ssm_env_event_t timeout_msg = {.type = SSM_EXT_INPUT}; */
-
-/*   unsigned int key = irq_lock(); */
-/*   timeout_msg.time = timer64_read(ssm_timer_dev); */
-/*   timeout_msg.sv = container_of(cb, ssm_input_event_t, cb)->sv; */
-/*   k_msgq_put(&ssm_env_queue, &timeout_msg, K_NO_WAIT); */
-/*   irq_unlock(key); */
+  /* irq_unlock(key); */
 }
 
-void bind_input_handler(ssm_input_event_t *in, ssm_event_t *sv,
-                        gpio_device_t dev) {
-  in->port = device_get_binding(dev.label);
+static int initialize_input_device(ssm_input_event_t *in) {
+  int err;
+  in->port = device_get_binding(in->dev.label);
+  if (!in->port)
+    return -ENODEV;
 
-  if (gpio_pin_configure(in->port, dev.pin, GPIO_INPUT | dev.flags) < 0)
-    SSM_DEBUG_ASSERT(0, "gpio_pin_configure failed");
+  ssm_initialize_event(&in->sv);
 
-  if (gpio_pin_interrupt_configure(in->port, dev.pin, GPIO_INT_EDGE_TO_ACTIVE) <
-      0)
-    SSM_DEBUG_ASSERT(0, "gpio_pin_interrupt_configure failed");
+  err = gpio_pin_configure(in->port, in->dev.pin, GPIO_INPUT | in->dev.flags);
 
-  gpio_init_callback(&in->cb, ssm_gpio_input_handler, BIT(dev.pin));
-  if (gpio_add_callback(in->port, &in->cb))
-    SSM_DEBUG_ASSERT(0, "gpio_add_callback failed");
+  if (err)
+    return err;
 
-  in->sv = sv;
+  err = gpio_pin_interrupt_configure(in->port, in->dev.pin,
+                                     GPIO_INT_EDGE_TO_ACTIVE);
+  if (err)
+    return err;
+
+  gpio_init_callback(&in->cb, input_event_handler, BIT(in->dev.pin));
+
+  err = gpio_add_callback(in->port, &in->cb);
+  if (err)
+    return err;
+
+  in->initialized = true;
+  return 0;
 }
 
-void unbind_input_handler(ssm_input_event_t *in) {
-  if (gpio_remove_callback(in->port, &in->cb))
-    SSM_DEBUG_ASSERT(0, "gpio_remove_callback failed");
-  in->sv = NULL;
+#define INPUT_DEVICE_ENTRY(idx, dev_name)                                      \
+  [idx] = {.initialized = false, .dev = DT_GPIO_DEV(dev_name), .index = idx}
+
+static ssm_input_event_t inputs[256] = {INPUT_DEVICE_ENTRY(0, sw0),
+                                        INPUT_DEVICE_ENTRY(1, sw1)};
+
+ssm_output_bool_t led0_out = {.initialized = false, .dev = DT_GPIO_DEV(led0)};
+
+ssm_event_t *const sw0 = &inputs[0].sv;
+ssm_event_t *const sw1 = &inputs[1].sv;
+ssm_bool_t *const led0 = &led0_out.sv;
+
+int initialize_static_input_device(ssm_sv_t *sv) {
+  if (sv == &sw0->sv)
+    return initialize_input_device(&inputs[0]);
+  else if (sv == &sw1->sv)
+    return initialize_input_device(&inputs[1]);
+  else
+    return -ENODEV;
+}
+
+ssm_sv_t *lookup_input_device(input_info *input) {
+  switch (input->type) {
+  case SSM_EVENT_T: {
+    ssm_sv_t *sv =
+        inputs[input->index].initialized ? &inputs[input->index].sv.sv : NULL;
+    return sv;
+  }
+  default:
+    SSM_DEBUG_ASSERT(0, "unknown input type: %d\r\n", input->type);
+    return NULL;
+  }
+}
+
+ssm_act_t *initialize_static_output_device(ssm_act_t *parent,
+                                           ssm_priority_t priority,
+                                           ssm_depth_t depth, ssm_sv_t *sv) {
+  if (sv == &led0->sv)
+    return enter_out_handler(parent, priority, depth, &led0_out);
+  else
+    return NULL;
 }

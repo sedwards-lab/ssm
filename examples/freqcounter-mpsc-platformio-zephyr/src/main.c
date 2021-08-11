@@ -34,10 +34,6 @@ uint32_t packet_get_len(union mpsc_pbuf_generic *packet) {
 }
 
 uint32_t dropped = 0;
-void packet_notify_drop(struct mpsc_pbuf_buffer *buffer,
-                        union mpsc_pbuf_generic *packet) {
-  dropped++;
-}
 
 /**
  * Thread responsible for processing events (messages), calling ssm_tick(), and
@@ -50,25 +46,24 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
       .buf = input_pbuf_data,
       .size = SSM_INPUT_PBUF_SIZE,
       .get_wlen = packet_get_len,
-      .notify_drop = packet_notify_drop,
+      .notify_drop = NULL, // not necessary as long as we don't use overwrite policy
       .flags = 0,
   };
 
   mpsc_pbuf_init(&input_pbuf, &input_pbuf_cfg);
 
-  ssm_activate(
-      ssm_entry_point(&ssm_top_parent, SSM_ROOT_PRIORITY, SSM_ROOT_DEPTH));
+  ssm_program_initialize();
 
   // TODO: we are assuming no input events at time 0.
   ssm_tick();
 
   ssm_input_packet_t *input_packet = NULL;
 
-  ssm_time_t _last_input_time = 0l; // For debugging/asserting
+  /* ssm_time_t _last_input_time = 0l; // For debugging/asserting */
 
   for (;;) {
-    ssm_time_t _wall_time =
-        timer64_read(ssm_timer_dev); // For debbugging/testing
+    /* ssm_time_t _wall_time = */
+    /*     timer64_read(ssm_timer_dev); // For debbugging/testing */
 
     {
       uint32_t d = dropped;
@@ -78,40 +73,41 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
       }
     }
 
-    { // Invariant: now < wall time
-      SSM_DEBUG_ASSERT(ssm_now() < _wall_time,
-                       "SSM logical time raced past wallclock time:\r\n"
-                       "now:  %llx\r\nwall: %llx\r\n",
-                       ssm_now(), _wall_time);
-    }
-
+    /* { // Invariant: now < wall time */
+    /*   SSM_DEBUG_ASSERT(ssm_now() < _wall_time, */
+    /*                    "SSM logical time raced past wallclock time:\r\n" */
+    /*                    "now:  %llx\r\nwall: %llx\r\n", */
+    /*                    ssm_now(), _wall_time); */
+    /* } */
 
     ssm_time_t next_time = ssm_next_event_time();
 
     if (input_packet) {
-      { // Invariant: input time < wall time, due to monotonicity of timer
-        SSM_DEBUG_ASSERT(input_packet->time < _wall_time,
-                         "Obtained input from the future:\r\n"
-                         "input: %llx\r\nwall:  %llx\r\n",
-                         input_packet->time, _wall_time);
-      }
+      ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1);
+      /* { // Invariant: input time < wall time, due to monotonicity of timer */
+      /*   SSM_DEBUG_ASSERT(packet_time < _wall_time, */
+      /*                    "Obtained input from the future:\r\n" */
+      /*                    "input: %llx\r\nwall:  %llx\r\n", */
+      /*                    packet_time, _wall_time); */
+      /* } */
 
-      if (input_packet->time <= next_time) {
+      if (packet_time <= next_time) {
         // TODO: handle values too
-        ssm_schedule(input_packet->sv, input_packet->time);
+        ssm_schedule(lookup_input_device(&input_packet->input), packet_time);
 
         mpsc_pbuf_free(&input_pbuf, (union mpsc_pbuf_generic *)input_packet);
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
 
-        if (input_packet) { // Invariant: input time' <= input time
-          SSM_DEBUG_ASSERT(_last_input_time < input_packet->time,
-                           "Inputs queued out of order:\r\n"
-                           "input': %016llx\r\n"
-                           "input:  %016llx\r\n",
-                           _last_input_time, input_packet->time);
-          // Note: for now, we assume input events cannot be simultaneous.
-          _last_input_time = input_packet->time;
-        }
+        /* if (input_packet) { // Invariant: input time' <= input time */
+        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1); */
+        /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, */
+        /*                    "Inputs queued out of order:\r\n" */
+        /*                    "input': %016llx\r\n" */
+        /*                    "input:  %016llx\r\n", */
+        /*                    _last_input_time, packet_time); */
+        /*   // Note: for now, we assume input events cannot be simultaneous. */
+        /*   _last_input_time = packet_time; */
+        /* } */
       }
 
       ssm_tick();
@@ -122,7 +118,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         // Double check one last time.
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
         if (input_packet)
-          // We can't tick here.
+          // We can't tick here. TODO: don't put this here, elide this with
+          // another branch, even though this is very unlikely.
           continue;
         ssm_tick();
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
@@ -141,7 +138,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
             break;
           case -ETIME:
             SSM_DEBUG_PRINT(":: set_alarm: alarm expired\r\n");
-            k_sem_take(&tick_sem, K_FOREVER);
+            k_sem_take(&tick_sem, K_FOREVER); // FIXME: shouldn't be necessary??
             break;
           case -EBUSY:
             SSM_DEBUG_ASSERT(-EBUSY, "set_alarm failed: already set\r\n");
@@ -165,10 +162,11 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         k_sem_reset(&tick_sem);
         input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf);
 
-        if (input_packet) { // Invariant: input time' <= input time
-          SSM_DEBUG_ASSERT(_last_input_time < input_packet->time, "");
-          _last_input_time = input_packet->time;
-        }
+        /* if (input_packet) { // Invariant: input time' <= input time */
+        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick, input_packet->mtk0, input_packet->mtk1); */
+        /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, ""); */
+        /*   _last_input_time = packet_time; */
+        /* } */
       }
     }
   }
