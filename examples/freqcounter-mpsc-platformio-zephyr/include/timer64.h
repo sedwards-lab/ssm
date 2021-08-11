@@ -6,9 +6,10 @@
 int timer64_init(const struct device *dev);
 int timer64_start(const struct device *dev);
 uint64_t timer64_read(const struct device *dev);
-int timer64_set_alarm(const struct device *dev, uint64_t wake_time,
-                      counter_alarm_callback_t cb, void *user_data);
-int timer64_cancel_alarm(const struct device *dev);
+int timer64_set_alarm(const struct device *dev, uint8_t channel,
+                      uint64_t wake_time, counter_alarm_callback_t cb,
+                      void *user_data);
+int timer64_cancel_alarm(const struct device *dev, uint8_t channel);
 
 extern volatile uint32_t macroticks;
 
@@ -40,8 +41,7 @@ extern volatile uint32_t macroticks;
     *(mtk1) = macroticks;                                                      \
   } while (0)
 
-
-#define TIMER64_CALC(ctr, mtk0, mtk1)                                         \
+#define TIMER64_CALC(ctr, mtk0, mtk1)                                          \
   (mtk0 == mtk1 ? TIMER64_LO_PARITY_BIT(ctr) == TIMER64_HI_PARITY_BIT(mtk0)    \
                       ? TIMER64_COMBINE(mtk0, ctr)                             \
                       : TIMER64_COMBINE(mtk0 + 1, ctr)                         \
