@@ -21,7 +21,7 @@ LOG_MODULE_REGISTER(main);
 const struct device *ssm_timer_dev = 0;
 
 K_SEM_DEFINE(tick_sem, 0, 1);
-uint32_t input_pbuf_data[SSM_INPUT_PBUF_SIZE];
+ssm_input_packet_t input_buffer[INPUT_BUFFER_SIZE];
 
 /** Send a timeout event to wake up the ssm_tick_thread. */
 static void send_timeout_event(const struct device *dev, uint8_t chan,
