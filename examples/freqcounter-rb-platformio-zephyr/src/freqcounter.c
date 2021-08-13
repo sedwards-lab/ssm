@@ -114,7 +114,7 @@ void step_freq_count(struct ssm_act *actg) {
       if (ssm_event_on(&acts->gate.sv)) {
         SSM_DEBUG_PRINT("freq_count [%llu]: Received gate...\r\n", ssm_now());
 
-        LOG_INF("Frequency: %u Hz\r\n", acts->count);
+        LOG_INF("Frequency: %u Hz <---------------\r\n", acts->count);
 
         ssm_later_event(&acts->gate, ssm_now() + acts->gate_period);
 

@@ -60,7 +60,10 @@ typedef struct {
   input_info input;
 } ssm_input_packet_t;
 
-#define INPUT_BUFFER_SIZE 1024
+
+// Input buffer size must be power of 2 for fast mod operation.
+#define INPUT_BUFFER_EXPONENT 12
+#define INPUT_BUFFER_SIZE (1 << INPUT_BUFFER_EXPONENT)
 
 extern ssm_input_packet_t input_buffer[INPUT_BUFFER_SIZE];
 /* extern atomic_t rb_wclaim; */
@@ -68,7 +71,7 @@ extern atomic_t rb_wcommit; // this might not need to be atomic
 extern atomic_t rb_rclaim;
 /* extern atomic_t rb_rcommit; */
 
-#define IBI_MOD(idx) (idx % INPUT_BUFFER_SIZE)
+#define IBI_MOD(idx) ((idx) % INPUT_BUFFER_SIZE)
 
 extern struct k_sem tick_sem;
 
