@@ -126,6 +126,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         /* } */
       }
 
+      /* k_sleep(K_MSEC(5)); */
       ssm_tick();
 
     } else {
@@ -220,7 +221,7 @@ void main() {
   err = timer64_init(ssm_timer_dev);
   SSM_DEBUG_ASSERT(!err, "timer64_init: %d\r\n", err);
 
-  k_sleep(K_SECONDS(1));
+  /* k_sleep(K_SECONDS(1)); */
 
   k_thread_create(&ssm_tick_thread, ssm_tick_thread_stack,
                   K_THREAD_STACK_SIZEOF(ssm_tick_thread_stack),

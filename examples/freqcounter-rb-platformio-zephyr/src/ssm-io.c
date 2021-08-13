@@ -163,20 +163,6 @@ static void input_event_handler(const struct device *port,
 
   atomic_inc(&rb_wcommit);
   k_sem_give(&tick_sem);
-
-  /* } */
-  /* /1* unsigned int key = irq_lock(); // probably not necessary *1/ */
-
-  /*     &input_pbuf, sizeof(ssm_input_packet_t), K_NO_WAIT); */
-
-  /* if (input_packet) { */
-  /*   // TODO: coerce the compiler into making one write instead of two */
-  /*   mpsc_pbuf_commit(&input_pbuf, (union mpsc_pbuf_generic *)input_packet);
-   */
-  /* } else { */
-  /*   dropped++; */
-  /* } */
-  /* input_count++; */
 }
 
 static int initialize_input_device(ssm_input_event_t *in) {
