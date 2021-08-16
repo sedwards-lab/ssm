@@ -5,6 +5,9 @@
 #include <sys/atomic.h>
 #include <zephyr.h>
 
+#include <drivers/clock_control.h>
+#include <drivers/clock_control/nrf_clock_control.h>
+
 #include "ssm-platform.h"
 #include "timer64.h"
 
@@ -13,6 +16,8 @@ LOG_MODULE_REGISTER(main);
 #if !DT_NODE_HAS_STATUS(DT_ALIAS(ssm_timer), okay)
 #error "ssm-timer device is not supported on this board"
 #endif
+
+#define CLOCK_NODE DT_INST(0, nordic_nrf_clock)
 
 #define SSM_TICK_STACKSIZE 4096
 #define SSM_TICK_PRIORITY 7
@@ -131,6 +136,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
 
     } else {
       if (next_time < timer64_read(ssm_timer_dev)) {
+
         // It's possible that we received input since last checking input.
         // Double check one last time
         wcommit = atomic_get(&rb_wcommit);
@@ -143,6 +149,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
           // We can't tick here. TODO: don't put this here, elide this with
           // another branch, even though this is very unlikely.
           continue;
+
         ssm_tick();
 
         wcommit = atomic_get(&rb_wcommit);
@@ -207,11 +214,61 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
 K_THREAD_STACK_DEFINE(ssm_tick_thread_stack, SSM_TICK_STACKSIZE);
 struct k_thread ssm_tick_thread;
 
+static void show_clocks(void)
+{
+	static const char *const lfsrc_s[] = {
+#if defined(CLOCK_LFCLKSRC_SRC_LFULP)
+		[NRF_CLOCK_LFCLK_LFULP] = "LFULP",
+#endif
+		[NRF_CLOCK_LFCLK_RC] = "LFRC",
+		[NRF_CLOCK_LFCLK_Xtal] = "LFXO",
+		[NRF_CLOCK_LFCLK_Synth] = "LFSYNT",
+	};
+	static const char *const hfsrc_s[] = {
+		[NRF_CLOCK_HFCLK_LOW_ACCURACY] = "HFINT",
+		[NRF_CLOCK_HFCLK_HIGH_ACCURACY] = "HFXO",
+	};
+	static const char *const clkstat_s[] = {
+		[CLOCK_CONTROL_STATUS_STARTING] = "STARTING",
+		[CLOCK_CONTROL_STATUS_OFF] = "OFF",
+		[CLOCK_CONTROL_STATUS_ON] = "ON",
+		[CLOCK_CONTROL_STATUS_UNKNOWN] = "UNKNOWN",
+	};
+	union {
+		unsigned int raw;
+		nrf_clock_lfclk_t lf;
+		nrf_clock_hfclk_t hf;
+	} src;
+	enum clock_control_status clkstat;
+	bool running;
+
+	clkstat = clock_control_get_status(ssm_timer_dev, CLOCK_CONTROL_NRF_SUBSYS_LF);
+	running = nrf_clock_is_running(NRF_CLOCK, NRF_CLOCK_DOMAIN_LFCLK,
+				       &src.lf);
+	printk("LFCLK[%s]: %s %s ; ", clkstat_s[clkstat],
+	       running ? "Running" : "Off", lfsrc_s[src.lf]);
+	clkstat = clock_control_get_status(ssm_timer_dev, CLOCK_CONTROL_NRF_SUBSYS_HF);
+	running = nrf_clock_is_running(NRF_CLOCK, NRF_CLOCK_DOMAIN_HFCLK,
+				       &src.hf);
+	printk("HFCLK[%s]: %s %s\n", clkstat_s[clkstat],
+	       running ? "Running" : "Off", hfsrc_s[src.hf]);
+}
+
 void main() {
   int err;
+  const struct device *clock;
 
   LOG_INF("Sleeping for a second for you to start a terminal\r\n");
   k_sleep(K_SECONDS(1));
+
+  clock = device_get_binding(DT_LABEL(CLOCK_NODE));
+  SSM_DEBUG_ASSERT(clock, "device_get_binding failed with clock\r\n");
+
+  err = clock_control_on(clock, CLOCK_CONTROL_NRF_SUBSYS_HF);
+  SSM_DEBUG_ASSERT(!err, "clock_control_on: %d\r\n", err);
+
+  show_clocks();
+
   LOG_INF("Starting...\r\n");
 
   ssm_timer_dev = device_get_binding(DT_LABEL(DT_ALIAS(ssm_timer)));
@@ -221,7 +278,6 @@ void main() {
   err = timer64_init(ssm_timer_dev);
   SSM_DEBUG_ASSERT(!err, "timer64_init: %d\r\n", err);
 
-  /* k_sleep(K_SECONDS(1)); */
 
   k_thread_create(&ssm_tick_thread, ssm_tick_thread_stack,
                   K_THREAD_STACK_SIZEOF(ssm_tick_thread_stack),
