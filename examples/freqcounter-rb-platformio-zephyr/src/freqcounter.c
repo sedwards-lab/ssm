@@ -102,6 +102,8 @@ struct ssm_act *enter_freq_count(struct ssm_act *caller,
 }
 
 void step_freq_count(struct ssm_act *actg) {
+  SSM_PROFILE(PROF_USER_RESUME);
+
   act_freq_count_t *acts = container_of(actg, act_freq_count_t, act);
 
   switch (actg->pc) {
@@ -120,6 +122,8 @@ void step_freq_count(struct ssm_act *actg) {
 
         ssm_sensitize(&acts->gate.sv, &acts->trig2);
         actg->pc = 1;
+
+        SSM_PROFILE(PROF_USER_YIELD);
         return;
 
       case 1:; // Off-cycle;
@@ -140,6 +144,7 @@ void step_freq_count(struct ssm_act *actg) {
       ssm_sensitize(&acts->signal->sv, &acts->trig1);
       ssm_sensitize(&acts->gate.sv, &acts->trig2);
       actg->pc = 2;
+      SSM_PROFILE(PROF_USER_YIELD);
       return;
 
     case 2:;
@@ -151,6 +156,7 @@ void step_freq_count(struct ssm_act *actg) {
   }
 
   ssm_leave(actg, sizeof(act_freq_count_t));
+  SSM_PROFILE(PROF_USER_LEAVE);
 }
 
 int ssm_program_initialize(void) {

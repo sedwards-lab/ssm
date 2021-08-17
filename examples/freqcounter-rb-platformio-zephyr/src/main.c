@@ -34,8 +34,48 @@ static void send_timeout_event(const struct device *dev, uint8_t chan,
   k_sem_give(&tick_sem);
 }
 
-uint32_t packet_get_len(union mpsc_pbuf_generic *packet) {
-  return sizeof(ssm_input_packet_t);
+// "random" offset to make sure we don't sample in phase
+#define PROFILE_PERIOD (SSM_MILLISECOND + 0xbeef)
+
+volatile uint32_t profile_tag = 0;
+uint32_t profile_counters[PROF_LIMIT] = {0};
+uint32_t profile_cnt = 0;
+
+static void profile(const struct device *dev, uint8_t chan, uint32_t ticks,
+                        void *user_data) {
+  profile_counters[profile_tag]++;
+
+  if (profile_cnt++ > 6000) {
+    profile_cnt = 0;
+#define LOG_PROF(sym) do { LOG_INF(#sym " %d", profile_counters[sym]); profile_counters[sym] = 0; } while (0)
+    LOG_PROF(PROF_MAIN_SETUP);
+    LOG_PROF(PROF_MAIN_CONTINUE);
+    LOG_PROF(PROF_MAIN_INPUT_CONSUME);
+    LOG_PROF(PROF_MAIN_INPUT_CHECK_INPUT);
+    LOG_PROF(PROF_MAIN_INPUT_TICK);
+    LOG_PROF(PROF_MAIN_NO_INPUT);
+    LOG_PROF(PROF_MAIN_TICK_CHECK_INPUT);
+    LOG_PROF(PROF_MAIN_TICK_TICK);
+    LOG_PROF(PROF_MAIN_TICK_INPUT_CHECK);
+    LOG_PROF(PROF_MAIN_SLEEP_SET_ALARM);
+    LOG_PROF(PROF_MAIN_SLEEP_BLOCK);
+    LOG_PROF(PROF_MAIN_WAKE_CANCEL);
+    LOG_PROF(PROF_MAIN_WAKE_SEM_RESET);
+    LOG_PROF(PROF_MAIN_WAKE_CHECK_INPUT);
+    LOG_PROF(PROF_INPUT_ENTER);
+    LOG_PROF(PROF_INPUT_READTIME);
+    LOG_PROF(PROF_INPUT_ALLOC);
+    LOG_PROF(PROF_INPUT_COMMIT);
+    LOG_PROF(PROF_INPUT_LEAVE);
+    LOG_PROF(PROF_USER_RESUME);
+    LOG_PROF(PROF_USER_YIELD);
+    LOG_PROF(PROF_USER_LEAVE);
+  }
+
+  if (timer64_set_alarm(ssm_timer_dev, 2,
+                        ticks + PROFILE_PERIOD,
+                        profile, NULL))
+    LOG_ERR("could not set profile alarm");
 }
 
 uint32_t input_count = 0;
@@ -74,6 +114,13 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
                         log_dropped, NULL))
     LOG_ERR("could not set drop log alarm");
 
+  SSM_PROFILE(PROF_MAIN_SETUP);
+
+  if (timer64_set_alarm(ssm_timer_dev, 2,
+                        timer64_read(ssm_timer_dev) + PROFILE_PERIOD,
+                        profile, NULL))
+    LOG_ERR("could not set drop log alarm");
+
   ssm_program_initialize();
 
   // TODO: we are assuming no input events at time 0.
@@ -82,6 +129,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
   ssm_input_packet_t *input_packet = NULL;
 
   for (;;) {
+    SSM_PROFILE(PROF_MAIN_CONTINUE);
     uint32_t wcommit, rclaim;
 
     ssm_time_t next_time = ssm_next_event_time();
@@ -92,8 +140,11 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
 
       if (packet_time <= next_time) {
         // TODO: handle values too
+        SSM_PROFILE(PROF_MAIN_INPUT_CONSUME);
         ssm_schedule(lookup_input_device(&input_packet->input), packet_time);
         atomic_inc(&rb_rclaim);
+
+        SSM_PROFILE(PROF_MAIN_INPUT_CHECK_INPUT);
         wcommit = atomic_get(&rb_wcommit);
         rclaim = atomic_get(&rb_rclaim);
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
@@ -101,12 +152,13 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
                            : &input_buffer[IBI_MOD(rclaim)];
       }
 
-      /* k_sleep(K_MSEC(5)); */
+      SSM_PROFILE(PROF_MAIN_INPUT_TICK);
       ssm_tick();
 
     } else {
-
+      SSM_PROFILE(PROF_MAIN_NO_INPUT);
       if (next_time <= timer64_read(ssm_timer_dev)) {
+        SSM_PROFILE(PROF_MAIN_TICK_CHECK_INPUT);
         // It's possible that we received input since last checking input.
         // Double check one last time
         wcommit = atomic_get(&rb_wcommit);
@@ -119,8 +171,10 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
           // another branch, even though this is very unlikely.
           continue;
 
+        SSM_PROFILE(PROF_MAIN_TICK_TICK);
         ssm_tick();
 
+        SSM_PROFILE(PROF_MAIN_TICK_INPUT_CHECK);
         wcommit = atomic_get(&rb_wcommit);
         rclaim = atomic_get(&rb_rclaim);
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
@@ -128,6 +182,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
                            : &input_buffer[IBI_MOD(rclaim)];
       } else {
         if (next_time != SSM_NEVER) {
+          SSM_PROFILE(PROF_MAIN_SLEEP_SET_ALARM);
           SSM_DEBUG_PRINT(":: setting alarm for [next_time: %016llx]\r\n",
                           next_time);
 
@@ -151,10 +206,13 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
             SSM_DEBUG_ASSERT(err, "set_alarm failed for unknown reasons\r\n");
           }
         }
+        SSM_PROFILE(PROF_MAIN_SLEEP_BLOCK);
         k_sem_take(&tick_sem, K_FOREVER);
+        SSM_PROFILE(PROF_MAIN_WAKE_CANCEL);
         // Cancel any potential pending alarm if it hasn't gone off yet.
         timer64_cancel_alarm(ssm_timer_dev, 0);
 
+        SSM_PROFILE(PROF_MAIN_WAKE_SEM_RESET);
         // It's possible that the alarm had gone off before we cancelled it; we
         // make sure that its sem_give doesn't stick around and cause premature
         // wake-up next time around.
@@ -162,6 +220,8 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         // Note that it's also possible for this to clobber the sem_give of an
         // input handler. So, we _must_ follow this with another input check.
         k_sem_reset(&tick_sem);
+
+        SSM_PROFILE(PROF_MAIN_WAKE_CHECK_INPUT);
         wcommit = atomic_get(&rb_wcommit);
         rclaim = atomic_get(&rb_rclaim);
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
