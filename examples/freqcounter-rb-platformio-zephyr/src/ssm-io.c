@@ -141,10 +141,15 @@ static void input_event_handler(const struct device *port,
   input_count++;
   uint32_t wcommit, rclaim;
   uint32_t mtk0, ctr;
+
+  SSM_PROFILE(PROF_INPUT_ENTER);
+
   mtk0 = macroticks;
   compiler_barrier();
   counter_get_value(ssm_timer_dev, &ctr);
   compiler_barrier();
+
+  SSM_PROFILE(PROF_INPUT_READTIME);
 
   wcommit = atomic_get(&rb_wcommit);
   rclaim = atomic_get(&rb_rclaim);
@@ -158,6 +163,8 @@ static void input_event_handler(const struct device *port,
 
   ssm_input_packet_t *input_packet = &input_buffer[IBI_MOD(wcommit)];
 
+  SSM_PROFILE(PROF_INPUT_ALLOC);
+
   compiler_barrier();
 
   input_packet->mtk1 = macroticks;
@@ -168,7 +175,12 @@ static void input_event_handler(const struct device *port,
                    .index = container_of(cb, ssm_input_event_t, cb)->index};
 
   atomic_inc(&rb_wcommit);
+
+  SSM_PROFILE(PROF_INPUT_COMMIT);
+
   k_sem_give(&tick_sem);
+
+  SSM_PROFILE(PROF_INPUT_LEAVE);
 }
 
 static int initialize_input_device(ssm_input_event_t *in) {
