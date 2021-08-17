@@ -81,62 +81,32 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
 
   ssm_input_packet_t *input_packet = NULL;
 
-  /* ssm_time_t _last_input_time = 0l; // For debugging/asserting */
-
   for (;;) {
     uint32_t wcommit, rclaim;
-    /* ssm_time_t _wall_time = */
-    /*     timer64_read(ssm_timer_dev); // For debbugging/testing */
-
-    /* { // Invariant: now < wall time */
-    /*   SSM_DEBUG_ASSERT(ssm_now() < _wall_time, */
-    /*                    "SSM logical time raced past wallclock time:\r\n" */
-    /*                    "now:  %llx\r\nwall: %llx\r\n", */
-    /*                    ssm_now(), _wall_time); */
-    /* } */
 
     ssm_time_t next_time = ssm_next_event_time();
 
     if (input_packet) {
       ssm_time_t packet_time = TIMER64_CALC(
           input_packet->tick, input_packet->mtk0, input_packet->mtk1);
-      /* { // Invariant: input time < wall time, due to monotonicity of timer */
-      /*   SSM_DEBUG_ASSERT(packet_time < _wall_time, */
-      /*                    "Obtained input from the future:\r\n" */
-      /*                    "input: %llx\r\nwall:  %llx\r\n", */
-      /*                    packet_time, _wall_time); */
-      /* } */
 
       if (packet_time <= next_time) {
         // TODO: handle values too
         ssm_schedule(lookup_input_device(&input_packet->input), packet_time);
-
         atomic_inc(&rb_rclaim);
         wcommit = atomic_get(&rb_wcommit);
         rclaim = atomic_get(&rb_rclaim);
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
                            ? NULL
                            : &input_buffer[IBI_MOD(rclaim)];
-
-        /* if (input_packet) { // Invariant: input time' <= input time */
-        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick,
-         * input_packet->mtk0, input_packet->mtk1); */
-        /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, */
-        /*                    "Inputs queued out of order:\r\n" */
-        /*                    "input': %016llx\r\n" */
-        /*                    "input:  %016llx\r\n", */
-        /*                    _last_input_time, packet_time); */
-        /*   // Note: for now, we assume input events cannot be simultaneous. */
-        /*   _last_input_time = packet_time; */
-        /* } */
       }
 
       /* k_sleep(K_MSEC(5)); */
       ssm_tick();
 
     } else {
-      if (next_time < timer64_read(ssm_timer_dev)) {
 
+      if (next_time <= timer64_read(ssm_timer_dev)) {
         // It's possible that we received input since last checking input.
         // Double check one last time
         wcommit = atomic_get(&rb_wcommit);
@@ -144,7 +114,6 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
                            ? NULL
                            : &input_buffer[IBI_MOD(rclaim)];
-        /* input_packet = (ssm_input_packet_t *)mpsc_pbuf_claim(&input_pbuf); */
         if (input_packet)
           // We can't tick here. TODO: don't put this here, elide this with
           // another branch, even though this is very unlikely.
@@ -168,11 +137,9 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
           switch (err) {
           case 0:
             SSM_DEBUG_PRINT(":: alarm set successfully\r\n");
-            k_sem_take(&tick_sem, K_FOREVER);
             break;
           case -ETIME:
             SSM_DEBUG_PRINT(":: set_alarm: alarm expired\r\n");
-            k_sem_take(&tick_sem, K_FOREVER); // FIXME: shouldn't be necessary??
             break;
           case -EBUSY:
             SSM_DEBUG_ASSERT(-EBUSY, "set_alarm failed: already set\r\n");
@@ -184,6 +151,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
             SSM_DEBUG_ASSERT(err, "set_alarm failed for unknown reasons\r\n");
           }
         }
+        k_sem_take(&tick_sem, K_FOREVER);
         // Cancel any potential pending alarm if it hasn't gone off yet.
         timer64_cancel_alarm(ssm_timer_dev, 0);
 
@@ -199,13 +167,6 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
         input_packet = IBI_MOD(wcommit) == IBI_MOD(rclaim)
                            ? NULL
                            : &input_buffer[IBI_MOD(rclaim)];
-
-        /* if (input_packet) { // Invariant: input time' <= input time */
-        /*   ssm_time_t packet_time = TIMER64_CALC(input_packet->tick,
-         * input_packet->mtk0, input_packet->mtk1); */
-        /*   SSM_DEBUG_ASSERT(_last_input_time < packet_time, ""); */
-        /*   _last_input_time = packet_time; */
-        /* } */
       }
     }
   }
