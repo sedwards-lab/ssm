@@ -27,9 +27,12 @@
 #include <devicetree.h>
 #include <drivers/gpio.h>
 #include <drivers/counter.h>
+#include <drivers/clock_control.h>
+#include <drivers/clock_control/nrf_clock_control.h>
 
 #include <ssm.h>
 
+#define CLOCK_NODE DT_INST(0, nordic_nrf_clock)
 #if !DT_NODE_HAS_STATUS(DT_ALIAS(led0), okay)
 #error "led0 device alias not defined"
 #endif
@@ -78,11 +81,11 @@ void step_blink(ssm_act_t *sact)
   case 0:
     ssm_sensitize(&(act->led->sv), &act->trigger);
     for (;;) {
-      ssm_later_bool(act->led, ssm_now() + SSM_MILLISECOND * 500, true);
+      ssm_later_bool(act->led, ssm_now() + SSM_MICROSECOND * 500, true);
       act->pc = 1;
       return;
     case 1:
-      ssm_later_bool(act->led, ssm_now() + SSM_MILLISECOND * 500, false);
+      ssm_later_bool(act->led, ssm_now() + SSM_MICROSECOND * 500, false);
       act->pc = 2;
       return;
     case 2:
@@ -152,7 +155,7 @@ void step_led_handler(ssm_act_t *sact)
 
   case 1:
     gpio_pin_set(act->port, act->pin, act->led->value);
-    printk("led: %d\r\n", act->led->value ? 1 : 0);
+    /* printk("led: %d\r\n", act->led->value ? 1 : 0); */
     return;
   }
   ssm_leave((ssm_act_t *) act, sizeof(led_handler_act_t));
@@ -187,7 +190,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3)
 
   for (;;) {
     ssm_tick();
-    printk("now %llu\r\n", ssm_now());
+    /* printk("now %llu\r\n", ssm_now()); */
 
     ssm_time_t wake = ssm_next_event_time();
     if (wake != SSM_NEVER) {
@@ -201,7 +204,7 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3)
 	printk("counter_set_channel_alarm failed: EINVAL\r\n");
 	break;
       case -ETIME:
-	printk("counter_set_channel_alarm failed: ETIME\r\n");
+	/* printk("counter_set_channel_alarm failed: ETIME\r\n"); */
 	break;
       case -EBUSY:
 	printk("counter_set_channel_alarm failed: EBUSY\r\n");
@@ -228,6 +231,45 @@ struct k_thread ssm_tick_thread;
 // main() terminates, so this variable can't be local to it
 ssm_bool_t led;
 
+static void show_clocks(void)
+{
+	static const char *const lfsrc_s[] = {
+#if defined(CLOCK_LFCLKSRC_SRC_LFULP)
+		[NRF_CLOCK_LFCLK_LFULP] = "LFULP",
+#endif
+		[NRF_CLOCK_LFCLK_RC] = "LFRC",
+		[NRF_CLOCK_LFCLK_Xtal] = "LFXO",
+		[NRF_CLOCK_LFCLK_Synth] = "LFSYNT",
+	};
+	static const char *const hfsrc_s[] = {
+		[NRF_CLOCK_HFCLK_LOW_ACCURACY] = "HFINT",
+		[NRF_CLOCK_HFCLK_HIGH_ACCURACY] = "HFXO",
+	};
+	static const char *const clkstat_s[] = {
+		[CLOCK_CONTROL_STATUS_STARTING] = "STARTING",
+		[CLOCK_CONTROL_STATUS_OFF] = "OFF",
+		[CLOCK_CONTROL_STATUS_ON] = "ON",
+		[CLOCK_CONTROL_STATUS_UNKNOWN] = "UNKNOWN",
+	};
+	union {
+		unsigned int raw;
+		nrf_clock_lfclk_t lf;
+		nrf_clock_hfclk_t hf;
+	} src;
+	enum clock_control_status clkstat;
+	bool running;
+
+	clkstat = clock_control_get_status(ssm_timer_dev, CLOCK_CONTROL_NRF_SUBSYS_LF);
+	running = nrf_clock_is_running(NRF_CLOCK, NRF_CLOCK_DOMAIN_LFCLK,
+				       &src.lf);
+	printk("LFCLK[%s]: %s %s ; ", clkstat_s[clkstat],
+	       running ? "Running" : "Off", lfsrc_s[src.lf]);
+	clkstat = clock_control_get_status(ssm_timer_dev, CLOCK_CONTROL_NRF_SUBSYS_HF);
+	running = nrf_clock_is_running(NRF_CLOCK, NRF_CLOCK_DOMAIN_HFCLK,
+				       &src.hf);
+	printk("HFCLK[%s]: %s %s\n", clkstat_s[clkstat],
+	       running ? "Running" : "Off", hfsrc_s[src.hf]);
+}
 /* main() =
  * bool led
  * blink(led) || led_handler(led, "led0")
@@ -237,6 +279,12 @@ void main()
   printk("Sleeping for a second for you to start a terminal\r\n");
   k_sleep(K_SECONDS(1));
   printk("Starting...\r\n");
+
+  const struct device *clock;
+
+  clock = device_get_binding(DT_LABEL(CLOCK_NODE));
+  clock_control_on(clock, CLOCK_CONTROL_NRF_SUBSYS_HF);
+  show_clocks();
 
   // Initialize the counter device
   if (!(ssm_timer_dev = device_get_binding(DT_LABEL(DT_ALIAS(ssm_timer))))) {
