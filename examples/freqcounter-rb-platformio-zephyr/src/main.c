@@ -170,6 +170,68 @@ void ssm_tick_thread_body(void *p1, void *p2, void *p3) {
       }
     }
   }
+
+  /* for (;;) { */
+  /*   SSM_PROFILE(PROF_MAIN_CONTINUE); */
+  /*   uint32_t wcommit, rclaim; */
+  /*   ssm_time_t next_time, wall_time; */
+
+  /*   next_time = ssm_next_event_time(); */
+  /*   wall_time = timer64_read(ssm_timer_dev); */
+  /*   compiler_barrier(); // We must read the timer before we read from the input queue */
+  /*   wcommit = atomic_get(&rb_wcommit); */
+  /*   rclaim = atomic_get(&rb_rclaim); */
+
+  /*   if (IBI_MOD(wcommit) != IBI_MOD(rclaim)) { */
+  /*     // There is available input */
+
+  /*     ssm_input_packet_t *input_packet = &input_buffer[IBI_MOD(rclaim)]; */
+  /*     ssm_time_t packet_time = TIMER64_CALC( */
+  /*         input_packet->tick, input_packet->mtk0, input_packet->mtk1); */
+  /*     if (packet_time <= next_time) { */
+  /*       // We are ready to process that input event. */
+  /*       // Schedule it and consume input packet from ring buffer */
+  /*       ssm_schedule(lookup_input_device(&input_packet->input), packet_time); */
+  /*       atomic_inc(&rb_rclaim); */
+  /*       // Check for more input or call tick. */
+  /*       continue; */
+  /*     } */
+  /*   } */
+  /*   if (next_time <= wall_time) { */
+  /*     // Ready to tick on internal event */
+  /*     ssm_tick(); */
+  /*   } else { */
+  /*     // Nothing to do; sleep */
+  /*     if (next_time != SSM_NEVER) { */
+  /*       // Set alarm */
+  /*       int err = timer64_set_alarm(ssm_timer_dev, 0, next_time, */
+  /*                                   send_timeout_event, NULL); */
+  /*       // Handle errors */
+  /*       switch (err) { */
+  /*       case 0: */
+  /*       case -ETIME: */
+  /*         // set_alarm successful (or expired) */
+  /*         break; */
+  /*       case -EBUSY: */
+  /*         SSM_DEBUG_ASSERT(-EBUSY, "set_alarm failed: already set\r\n"); */
+  /*       case -ENOTSUP: */
+  /*         SSM_DEBUG_ASSERT(-ENOTSUP, "set_alarm failed: not supported\r\n"); */
+  /*       case -EINVAL: */
+  /*         SSM_DEBUG_ASSERT(-EINVAL, "set_alarm failed: invalid settings\r\n"); */
+  /*       default: */
+  /*         SSM_DEBUG_ASSERT(err, "set_alarm failed for unknown reasons\r\n"); */
+  /*       } */
+  /*     } */
+  /*     k_sem_take(&tick_sem, K_FOREVER); */
+
+  /*     // Cancel any potential pending alarm if it hasn't gone off yet. */
+  /*     timer64_cancel_alarm(ssm_timer_dev, 0); */
+
+  /*     // It's possible that the alarm went off before we cancelled it; make */
+  /*     // sure that its sem_give doesn't cause premature wake-up later on. */
+  /*     k_sem_reset(&tick_sem); */
+  /*   } */
+  /* } */
 }
 
 K_THREAD_STACK_DEFINE(ssm_tick_thread_stack, SSM_TICK_STACKSIZE);
