@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(ssm_io);
 #endif
 
 #if !DT_NODE_HAS_STATUS(DT_ALIAS(sw1), okay)
-#error "sw0 device alias not defined"
+#error "sw1 device alias not defined"
 #endif
 
 /** My recreation of Zephyr 2.6's struct dt_spec */
@@ -138,18 +138,19 @@ static void input_event_handler(const struct device *port,
                                 struct gpio_callback *cb,
                                 gpio_port_pins_t pins) {
 
-  input_count++;
   uint32_t wcommit, rclaim;
   uint32_t mtk0, ctr;
 
-  SSM_PROFILE(PROF_INPUT_ENTER);
+  SSM_PROFILE(PROF_INPUT_BEFORE_READTIME);
+
+  /* input_count++; */
 
   mtk0 = macroticks;
   compiler_barrier();
   counter_get_value(ssm_timer_dev, &ctr);
   compiler_barrier();
 
-  SSM_PROFILE(PROF_INPUT_READTIME);
+  SSM_PROFILE(PROF_INPUT_BEFORE_ALLOC);
 
   wcommit = atomic_get(&rb_wcommit);
   rclaim = atomic_get(&rb_rclaim);
@@ -158,12 +159,13 @@ static void input_event_handler(const struct device *port,
     // Incrementing the write head would catch up to the read head, so we must
     // drop the packet.
     dropped++;
+    SSM_PROFILE(PROF_INPUT_BEFORE_LEAVE);
     return;
   }
 
   ssm_input_packet_t *input_packet = &input_buffer[IBI_MOD(wcommit)];
 
-  SSM_PROFILE(PROF_INPUT_ALLOC);
+  SSM_PROFILE(PROF_INPUT_BEFORE_COMMIT);
 
   compiler_barrier();
 
@@ -176,11 +178,11 @@ static void input_event_handler(const struct device *port,
 
   atomic_inc(&rb_wcommit);
 
-  SSM_PROFILE(PROF_INPUT_COMMIT);
+  SSM_PROFILE(PROF_INPUT_BEFORE_WAKE);
 
   k_sem_give(&tick_sem);
 
-  SSM_PROFILE(PROF_INPUT_LEAVE);
+  SSM_PROFILE(PROF_INPUT_BEFORE_LEAVE);
 }
 
 static int initialize_input_device(ssm_input_event_t *in) {
