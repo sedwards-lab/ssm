@@ -77,38 +77,41 @@ extern struct k_sem tick_sem;
 
 extern struct mpsc_pbuf_buffer input_pbuf;
 extern uint32_t dropped;
-extern uint32_t input_count;
+/* extern uint32_t input_count; */
 
 
 /**** Profiling ****/
 
 extern volatile uint32_t profile_tag;
-#define SSM_PROFILE(sym) profile_tag = sym
+extern const struct device *gpio_dev;
+
+#define LED_MASK(n) (1u << DT_GPIO_PIN(DT_ALIAS(led##n), gpios))
+#define LED_MASKS (LED_MASK(0) | LED_MASK(1) | LED_MASK(2) | LED_MASK(3))
+#define SYM_TO_VAL(sym, n) ((sym & (1u << n)) ? LED_MASK(n) : 0 )
+#define SYM_TO_VALS(sym) (SYM_TO_VAL(sym, 0) | SYM_TO_VAL(sym, 1) | SYM_TO_VAL(sym, 2) | SYM_TO_VAL(sym, 3))
+
+#define SSM_PROFILE(sym) do { compiler_barrier(); gpio_port_set_masked_raw(gpio_dev, LED_MASKS, SYM_TO_VALS(sym)); compiler_barrier(); } while (0)
+
+/* #define SSM_PROFILE(sym) do { compiler_barrier(); profile_tag = sym; compiler_barrier(); } while (0) */
 
 enum {
   PROF_MAIN_SETUP,
-  PROF_MAIN_CONTINUE,
-  PROF_MAIN_INPUT_CONSUME,
-  PROF_MAIN_INPUT_CHECK_INPUT,
-  PROF_MAIN_INPUT_TICK,
-  PROF_MAIN_NO_INPUT,
-  PROF_MAIN_TICK_CHECK_INPUT,
-  PROF_MAIN_TICK_TICK,
-  PROF_MAIN_TICK_INPUT_CHECK,
-  PROF_MAIN_SLEEP_SET_ALARM,
-  PROF_MAIN_SLEEP_BLOCK,
-  PROF_MAIN_WAKE_CANCEL,
-  PROF_MAIN_WAKE_SEM_RESET,
-  PROF_MAIN_WAKE_CHECK_INPUT,
-  PROF_INPUT_ENTER,
-  PROF_INPUT_READTIME,
-  PROF_INPUT_ALLOC,
-  PROF_INPUT_COMMIT,
-  PROF_INPUT_LEAVE,
-  PROF_USER_RESUME,
-  PROF_USER_YIELD,
-  PROF_USER_LEAVE,
+  PROF_MAIN_BEFORE_LOOP_CONTINUE,
+  PROF_MAIN_BEFORE_INPUT_CONSUME,
+  PROF_MAIN_BEFORE_TICK,
+  PROF_MAIN_BEFORE_SLEEP_ALARM,
+  PROF_MAIN_BEFORE_SLEEP_BLOCK,
+  PROF_MAIN_BEFORE_WAKE_RESET,
+  PROF_INPUT_BEFORE_READTIME,
+  PROF_INPUT_BEFORE_ALLOC,
+  PROF_INPUT_BEFORE_COMMIT,
+  PROF_INPUT_BEFORE_WAKE,
+  PROF_INPUT_BEFORE_LEAVE,
+  PROF_USER_BEFORE_STEP,
+  PROF_USER_BEFORE_YIELD,
+  PROF_USER_BEFORE_LEAVE,
   PROF_LIMIT,
 };
+
 
 #endif /* _SSM_PLATFORM_H */
