@@ -1,6 +1,6 @@
 # ssm
 
-**NOTE: Development in this repo has moved to [ssm-lang/ssm-runtime](github.com/ssm-lang/ssm-runtime).**
+**NOTE: Development in this repo has moved to [ssm-lang/ssm-runtime](http://www.github.com/ssm-lang/ssm-runtime).**
 
 ----
 
@@ -9,7 +9,7 @@ technique that allows explicit, precise timing control.
 
 An early version of this system is described in our FDL 2021 paper
 <http://www.cs.columbia.edu/~sedwards/papers/edwards2020sparse.pdf>.
-The artifact accompanying that paper may be found [here](https://github.com/sedwards-lab/ssm/releases/tag/fdl2020).
+The artifact accompanying that paper may be found [here](https://www.github.com/sedwards-lab/ssm/releases/tag/fdl2020).
 
 Documentation: http://sedwards-lab.github.io/ssm-doc
 
