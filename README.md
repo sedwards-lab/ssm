@@ -1,11 +1,17 @@
 # ssm
+
+**NOTE: Development in this repo has moved to [ssm-lang/ssm-runtime](github.com/ssm-lang/ssm-runtime).**
+
+----
+
 The Sparse Synchronous Model: A deterministic real-time execution
 technique that allows explicit, precise timing control.
 
-Documentation: http://sedwards-lab.github.io/ssm-doc
-
 An early version of this system is described in our FDL 2021 paper
-http://www.cs.columbia.edu/~sedwards/papers/edwards2020sparse.pdf
+<http://www.cs.columbia.edu/~sedwards/papers/edwards2020sparse.pdf>.
+The artifact accompanying that paper may be found [here](https://github.com/sedwards-lab/ssm/releases/tag/fdl2020).
+
+Documentation: http://sedwards-lab.github.io/ssm-doc
 
 To build and test the runtime system on your host,
 
@@ -30,3 +36,4 @@ To run the examples on embedded hardware,
    Note that PlatformIO will download and compile a separate copy of this
    (ssm runtime) library from github, not the one a few directories
    above the examples.
+`
