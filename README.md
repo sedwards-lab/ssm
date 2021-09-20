@@ -1,6 +1,6 @@
 # ssm
 
-**NOTE: Development in this repo has moved to [ssm-lang/ssm-runtime](http://www.github.com/ssm-lang/ssm-runtime).**
+**NOTE: Development in this repo has moved to [ssm-lang/ssm-runtime](https://www.github.com/ssm-lang/ssm-runtime).**
 
 ----
 
